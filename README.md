@@ -35,8 +35,24 @@ MPLBACKEND=Agg uv run jupyter execute nb/interactive_demo.ipynb
 
 # Run Jupyter server under correct venv
 uv run jupyter-lab .
+
+# Run benchmarks
+uv run richbench bench/
+
+# Run benchmarks with custom iterations
+uv run richbench bench/ --times 1000 --repeat 10
 ```
 
+## Benchmarking
+
+Performance benchmarks are located in `bench/` and use `richbench`:
+
+- Create benchmark files named `bench_*.py`
+- Define pairs of functions to compare
+- Use `block_until_ready()` for JAX operations to be meaningfully timed
+- Run with `uv run richbench bench/`
+
+You'll see speedup factors between different implementations.
 
 ## Conventions
 
@@ -55,6 +71,7 @@ uv run jupyter-lab .
 - `ruff` for linting.
 - `ty` for static type checking.
 - `pytest` for unit testing.
+- `richbench` for performance benchmarking.
 - Claude Code for AI-assisted fast prototyping.
 
 ## License
