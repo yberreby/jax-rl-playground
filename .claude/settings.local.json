@@ -5,7 +5,8 @@
       "Bash(ruff check:*)",
       "Bash(uvx ty:*)",
       "Bash(uv run -m pytest:*)",
-      "Bash(jupytext --to notebook:*)"
+      "Bash(uv run jupytext:*)",
+      "Bash(MPLBACKEND=Agg uv run jupyter execute:*)"
     ],
     "deny": []
   }

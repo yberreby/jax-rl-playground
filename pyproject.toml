@@ -1,5 +1,5 @@
 [project]
-name = "jax-ml-template"
+name = "src"
 version = "0.1.0"
 description = "A JAX-based ML project."
 readme = "README.md"
@@ -7,20 +7,28 @@ requires-python = ">=3.12"
 dependencies = [
     # Our bread and butter.
     "jax[cuda12]>=0.6.2",
+    # Plotting.
+    "matplotlib>=3.10.3",
     # Shape checking annotations.
     "jaxtyping>=0.3.2",
-    # Swiss army knife of JAX utils.
-    "equinox>=0.12.2",
     # Runtime type checking backend (used by jaxtyping).
     "beartype>=0.21.0",
+    # Jupyter within the venv for convenience.
+    "jupyterlab>=4.4.3",
     # Interactive matplotlib widgets in Jupyter.
     "ipympl>=0.9.7",
-    # Git-friendly notebook storage.
     "jupytext>=1.17.2",
-    # Unit testing.
-    "pytest>=8.4.1",
 ]
 
 [tool.ruff]
 # Ignore F821 and F722 for jaxtyping string annotations
 lint.ignore = ["F821", "F722"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

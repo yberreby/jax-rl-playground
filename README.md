@@ -23,7 +23,7 @@ just check
 ruff format
 
 # Convert notebook from jupytext (.py) to .ipynb
-uv tool run jupytext --to ipynb nb/interactive_demo.py
+uv run jupytext --to ipynb nb/interactive_demo.py
 
 # Run Jupyter server under correct venv
 uv run jupyter-lab .

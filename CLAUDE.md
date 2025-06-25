@@ -36,6 +36,9 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - Plan out API -> Write a test -> Write implementation -> Lint and run test -> Assess
 - Start with something basic, get it to work, refactor early, often, aggressively.
 
+# Python-specific points
+- Use `uv run myfile.py` or `uv run -m` to run code
+
 # JAX-specific points
 
 - Efficient tensor operations should be thought out in advance.
