@@ -1,7 +1,13 @@
 [project]
-name = "py-ml-template"
+name = "jax-ml-template"
 version = "0.1.0"
-description = "Add your description here"
+description = "A JAX-based ML project."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "beartype>=0.21.0",
+    "ipympl>=0.9.7",
+    "jax[cuda12]>=0.6.2",
+    "jaxtyping>=0.3.2",
+    "jupytext>=1.17.2",
+]
