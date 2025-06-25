@@ -4,6 +4,26 @@ A JAX-based ML project.
 
 Developed and tested on Arch Linux.
 
+## Development
+
+```bash
+# Lint
+ruff check
+
+# Typecheck
+uvx ty check
+
+# Run tests
+uv run -m pytest -v
+
+# If you have the `just` task runner installed, you can run all of the above with:
+just check
+
+# Formatting
+ruff format
+```
+
+
 ## Conventions
 
 - Type annotations wherever possible.
@@ -22,19 +42,3 @@ Developed and tested on Arch Linux.
 - `ty` for static type checking.
 - `pytest` for unit testing.
 - Claude Code for AI-assisted fast prototyping.
-
-```
-# Lint
-ruff check
-
-# Typecheck
-uvx ty check
-
-# Run tests
-uv run -m pytest -v
-
-# If you have the `just` task runner installed, you can run all of the above with:
-just check
-```
-
-Formatting: `ruff format`.
