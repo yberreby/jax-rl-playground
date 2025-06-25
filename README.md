@@ -16,6 +16,9 @@ uvx ty check
 # Run tests
 uv run -m pytest -v
 
+# Run benchmarks
+uv run richbench bench/
+
 # If you have the `just` task runner installed, you can run all of the above with:
 just check
 
@@ -35,12 +38,6 @@ MPLBACKEND=Agg uv run jupyter execute nb/interactive_demo.ipynb
 
 # Run Jupyter server under correct venv
 uv run jupyter-lab .
-
-# Run benchmarks
-uv run richbench bench/
-
-# Run benchmarks with custom iterations
-uv run richbench bench/ --times 1000 --repeat 10
 ```
 
 ## Benchmarking
