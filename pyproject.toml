@@ -27,6 +27,7 @@ lint.ignore = ["F821", "F722"]
 [dependency-groups]
 dev = [
     "pytest>=8.4.1",
+    "richbench>=1.0.3",
 ]
 
 [build-system]

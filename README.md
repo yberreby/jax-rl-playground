@@ -16,6 +16,9 @@ uvx ty check
 # Run tests
 uv run -m pytest -v
 
+# Run benchmarks
+uv run richbench bench/
+
 # If you have the `just` task runner installed, you can run all of the above with:
 just check
 
@@ -37,6 +40,16 @@ MPLBACKEND=Agg uv run jupyter execute nb/interactive_demo.ipynb
 uv run jupyter-lab .
 ```
 
+## Benchmarking
+
+Performance benchmarks are located in `bench/` and use `richbench`:
+
+- Create benchmark files named `bench_*.py`
+- Define pairs of functions to compare
+- Use `block_until_ready()` for JAX operations to be meaningfully timed
+- Run with `uv run richbench bench/`
+
+You'll see speedup factors between different implementations.
 
 ## Conventions
 
@@ -55,6 +68,7 @@ uv run jupyter-lab .
 - `ruff` for linting.
 - `ty` for static type checking.
 - `pytest` for unit testing.
+- `richbench` for performance benchmarking.
 - Claude Code for AI-assisted fast prototyping.
 
 ## License
