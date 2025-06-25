@@ -6,7 +6,8 @@
       "Bash(uvx ty:*)",
       "Bash(uv run -m pytest:*)",
       "Bash(uv run jupytext:*)",
-      "Bash(MPLBACKEND=Agg uv run jupyter execute:*)"
+      "Bash(MPLBACKEND=Agg uv run jupyter execute:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }
