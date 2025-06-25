@@ -1,7 +1,6 @@
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, ScalarLike, jaxtyped
-from beartype import beartype as typechecker
+from jaxtyping import Array, Float, ScalarLike
 from functools import partial
 from typing import Optional
 
@@ -26,11 +25,10 @@ def exponential_moving_average(
 
 @jax.jit
 def batch_correlate(
-    x: Float[Array, "batch n"],
-    y: Float[Array, "batch n"]
+    x: Float[Array, "batch n"], y: Float[Array, "batch n"]
 ) -> Float[Array, "batch (2*n-1)"]:
     # Use jnp.correlate for proper cross-correlation
     def correlate_pair(xy):
-        return jnp.correlate(xy[0], xy[1], mode='full')
+        return jnp.correlate(xy[0], xy[1], mode="full")
 
     return jax.vmap(correlate_pair)((x, y))

@@ -32,4 +32,9 @@ uvx ty check
 
 # Run tests
 uv run -m pytest -v
+
+# If you have the `just` task runner installed, you can run all of the above with:
+just check
 ```
+
+Formatting: `ruff format`.

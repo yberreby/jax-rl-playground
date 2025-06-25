@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 import numpy as np
+import pytest
 from src.core import exponential_moving_average, batch_correlate
 
 
@@ -57,3 +58,18 @@ def test_correlation_symmetry():
 
     # Cross-correlation has corr(x,y) = reverse(corr(y,x))
     np.testing.assert_allclose(xy, jnp.flip(yx, axis=-1), rtol=1e-6)
+
+
+def test_jaxtyping_shape_validation():
+    """Test that jaxtyping catches shape mismatches at runtime."""
+    # Test 1: Wrong number of dimensions for exponential_moving_average
+    with pytest.raises(Exception):  # jaxtyping will raise a validation error
+        values = jnp.ones((10, 3))  # 2D instead of 3D
+        alpha = jnp.array(0.1)
+        exponential_moving_average(values, alpha)
+
+    # Test 2: Wrong batch dimensions for batch_correlate
+    with pytest.raises(Exception):  # jaxtyping will raise a validation error
+        x = jnp.ones((3, 5))  # correct shape
+        y = jnp.ones((4, 5))  # wrong batch size
+        batch_correlate(x, y)
