@@ -22,8 +22,16 @@ just check
 # Formatting
 ruff format
 
-# Convert notebook from jupytext (.py) to .ipynb
-uv run jupytext --to ipynb nb/interactive_demo.py
+# Initial setup: convert .py to .ipynb
+uv run jupytext --to notebook nb/interactive_demo.py
+
+# Sync changes from .py to .ipynb
+uv run jupytext --sync nb/interactive_demo.py
+
+# Or pair in JupyterLab: right-click notebook → "Pair Notebook with percent Script"
+
+# Run headlessly
+MPLBACKEND=Agg uv run jupyter execute nb/interactive_demo.ipynb
 
 # Run Jupyter server under correct venv
 uv run jupyter-lab .
