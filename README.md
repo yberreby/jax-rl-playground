@@ -28,7 +28,7 @@ uv run jupytext --to notebook nb/interactive_demo.py
 # Sync changes from .py to .ipynb
 uv run jupytext --sync nb/interactive_demo.py
 
-# Or pair in JupyterLab: right-click notebook → "Pair Notebook with percent Script"
+# Or pair in JupyterLab: Command Palette → "Pair Notebook with percent Script"
 
 # Run headlessly
 MPLBACKEND=Agg uv run jupyter execute nb/interactive_demo.ipynb
