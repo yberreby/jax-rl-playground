@@ -34,10 +34,11 @@ x = np.linspace(0, 10, N)
 signal = np.sin(x) + 0.3 * np.sin(3 * x) + 0.2 * np.random.randn(len(x))
 
 fig, ax = plt.subplots(figsize=(8, 4))
-line_raw, = ax.plot(x, signal, 'b-', alpha=0.5, label='Raw')
-line_smooth, = ax.plot(x, signal, 'r-', linewidth=2, label='Smoothed')
+(line_raw,) = ax.plot(x, signal, "b-", alpha=0.5, label="Raw")
+(line_smooth,) = ax.plot(x, signal, "r-", linewidth=2, label="Smoothed")
 ax.legend()
 ax.grid(True, alpha=0.3)
+
 
 def update_plot(alpha=0.1):
     # Reshape signal to [batch=1, time=N, features=1]

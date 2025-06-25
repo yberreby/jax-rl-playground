@@ -1,6 +1,7 @@
 """Benchmark JAX functions using richbench."""
 
 import os
+
 # Force CPU before importing JAX
 os.environ["JAX_PLATFORMS"] = "cpu"
 
