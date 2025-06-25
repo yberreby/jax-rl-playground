@@ -17,6 +17,8 @@ dependencies = [
     "ipympl>=0.9.7",
     # Git-friendly notebook storage.
     "jupytext>=1.17.2",
+    # Unit testing.
+    "pytest>=8.4.1",
 ]
 
 [tool.ruff]
