@@ -2,6 +2,8 @@
 
 A JAX-based ML project.
 
+Developed and tested on Arch Linux.
+
 ## Conventions
 
 - Type annotations wherever possible.
