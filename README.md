@@ -42,3 +42,11 @@ ruff format
 - `ty` for static type checking.
 - `pytest` for unit testing.
 - Claude Code for AI-assisted fast prototyping.
+
+## License
+
+This project template is licensed under the MIT License.
+
+See `./LICENSE.md` for details.
+
+**Don't forget to update the license if you use this in your own project!**
