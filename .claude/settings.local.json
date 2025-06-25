@@ -4,7 +4,8 @@
       "Bash(mkdir:*)",
       "Bash(ruff check:*)",
       "Bash(uvx ty:*)",
-      "Bash(uv run -m pytest:*)"
+      "Bash(uv run -m pytest:*)",
+      "Bash(jupytext --to notebook:*)"
     ],
     "deny": []
   }

@@ -11,3 +11,7 @@ wheels/
 
 .pytest_cache
 .ruff_cache
+
+# Jupyter
+*.ipynb
+.ipynb_checkpoints/
