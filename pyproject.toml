@@ -1,8 +1,9 @@
 [project]
-name = "src"
+name = "jax-ml-template"
 version = "0.1.0"
 description = "A JAX-based ML project."
 readme = "README.md"
+license-files = ["LICEN[CS]E*"]
 requires-python = ">=3.12"
 dependencies = [
     # Our bread and butter.
@@ -20,16 +21,33 @@ dependencies = [
     "jupytext>=1.17.2",
 ]
 
+[project.urls]
+Repository = "https://github.com/yberreby/jax-ml-template"
+
+# [tool.uv.sources]
+# jax-ml-template = { workspace = true }
+
 [tool.ruff]
 # Ignore F821 and F722 for jaxtyping string annotations
 lint.ignore = ["F821", "F722"]
 
 [dependency-groups]
 dev = [
+    "jax-ml-template",
+    "pre-commit>=4.2.0",
     "pytest>=8.4.1",
     "richbench>=1.0.3",
+    "ruff>=0.12.0",
+    "rust-just>=1.40.0",
 ]
+
+[tool.uv.build-backend]
+module-name = "src"
+module-root = ""
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/"]

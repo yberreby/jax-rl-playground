@@ -4,6 +4,14 @@ A JAX-based ML project.
 
 Developed and tested on Arch Linux.
 
+## Git Hooks
+
+This project uses `pre-commit` to enforce code quality. To install the hooks, run:
+
+```bash
+uv run pre-commit install
+```
+
 ## Development
 
 ```bash
@@ -19,8 +27,8 @@ uv run -m pytest -v
 # Run benchmarks
 uv run richbench bench/
 
-# If you have the `just` task runner installed, you can run all of the above with:
-just check
+# You can run all of the above with:
+uv run just check
 
 # Formatting
 ruff format
