@@ -5,7 +5,6 @@ from flax import nnx
 
 
 def test_basic_nnx_training():
-    """Minimal test that NNX training works."""
     class Linear(nnx.Module):
         def __init__(self, din, dout, rngs):
             self.w = nnx.Param(jax.random.normal(rngs.params(), (din, dout)) * 0.1)
