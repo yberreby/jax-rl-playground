@@ -2,10 +2,10 @@ import jax.numpy as jnp
 import optax
 from flax import nnx
 from src.policy_nnx import GaussianPolicy
+from tests.common_patterns import create_loss_fn
 
 
 def test_policy_gradient_step():
-    """Test that GaussianPolicy can take a gradient step."""
     policy = GaussianPolicy(obs_dim=2, action_dim=1, hidden_dim=4)
     optimizer = nnx.Optimizer(policy, optax.adam(0.1))
     
@@ -16,10 +16,7 @@ def test_policy_gradient_step():
     mean_before, _ = policy(x)
     
     # Take gradient step
-    def loss_fn(policy):
-        mean, _ = policy(x)
-        return jnp.mean((mean - target) ** 2)
-    
+    loss_fn = create_loss_fn(x, target)
     loss, grads = nnx.value_and_grad(loss_fn)(policy)
     optimizer.update(grads)
     
