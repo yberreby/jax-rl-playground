@@ -78,7 +78,9 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - Comments in tests like "should" go in assert messages for reporting
 
 ## Test Commands
-- ALWAYS use `just check` or `just quick` - NEVER point pytest directly at files
+- Check the `./justfile` for up-to-date information
+- Use project-wide test collection with -k, maybe modules, but never point pytest to a .py
+- Use `just check` for full test suite
 - Use `just test <pattern>` or `uv run -m pytest -k "<pattern>"` for isolated testing
 - Use pytest markers for categorization:
   - `@pytest.mark.slow` for expensive tests
@@ -128,6 +130,7 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - JIT'd functions can take other JIT'd functions as arguments
 - Remember that Python control flow = static unrolling
 - If code is meant to be fast, it should be profiled/benchmarked
+- Use `block_until_ready()` when timing operations to separate JIT compilation from runtime
 
 ## JAX Workflow
 - Disable GPU preallocation: set `XLA_PYTHON_CLIENT_PREALLOCATE=false`
@@ -167,6 +170,60 @@ These details make the difference between working and non-working implementation
 - DRY obsessively
 - No docstrings until "200% done"
 - Use intermediate variables for clarity
-- Always run `just check` before execution
+- Always run `just check` before execution, preferably as part of the same command to avoid wasting a tool call
 - Don't clutter with examples or throwaway code
 - Integration tests ARE the examples
+
+# Current State Notes
+
+## Modules Available
+- `src/normalize`: Observation normalization and reward scaling
+- `src/init`: Sparse initialization  
+- `src/reinforce`: REINFORCE loss (takes policy function as argument)
+- `src/distributions`: Gaussian log probability calculation
+- `src/policy_nnx`: Flax NNX policy implementation
+
+## Key Design Decisions
+- REINFORCE loss is decoupled from policy implementation - takes a JIT'd policy function
+- normalize_obs is for normalizing observations, NOT for layer normalization
+- Using Flax NNX for neural network implementations
+
+## Flax NNX Critical Notes
+- Use `nnx.Param` for trainable parameters, NOT `nnx.Variable`
+- Access parameter values with `.value` (e.g., `self.w1.value`)
+- Example pattern:
+  ```python
+  class Model(nnx.Module):
+      def __init__(self, rngs):
+          self.w = nnx.Param(jax.random.normal(rngs.params(), shape))
+      
+      def __call__(self, x):
+          return x @ self.w.value
+  ```
+- Always use `uv run` when running Python scripts for dependencies
+
+## JAX Function Passing Pattern
+- JIT'd functions CAN be passed to other JIT'd functions
+- If passing a function as argument to a JIT'd function, mark it as static:
+  `@partial(jax.jit, static_argnames=["policy_fn"])`
+- The function being passed should itself be JIT'd
+
+## Common Debugging Patterns
+- If gradient flow isn't working, check:
+  1. Using `nnx.Param` not `nnx.Variable` for trainable params
+  2. Accessing with `.value`
+  3. Simple isolated test first before complex integration
+- Create minimal gradient flow tests to isolate issues
+- Test outputs should go to `tests/outputs/` (plots, CSVs)
+
+## Known Issues to Address
+- Magic numbers need to be extracted as constants
+- Test setup code needs factoring to reduce duplication
+- Research files in root directory should be moved
+- Inline tests in implementation files need moving to test.py
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

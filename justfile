@@ -1,4 +1,5 @@
-test: fastcheck
+check: fastcheck
+    uv run -m pytest
 
 # Create venv and install all dependencies from uv.lock
 setup:
@@ -17,4 +18,4 @@ quicktest: fastcheck
 
 # Test specific modules/tests using pattern matching
 test pattern: fastcheck
-    uv run -m pytest -k "{{pattern}}" -v
+    uv run -m pytest -k "{{pattern}}"

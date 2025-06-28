@@ -25,6 +25,7 @@ dependencies = [
     # Interactive matplotlib widgets in Jupyter.
     "ipympl>=0.9.7",
     "jupytext>=1.17.2",
+    "pandas>=2.3.0",
 ]
 
 [project.urls]
