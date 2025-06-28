@@ -1,10 +1,10 @@
 # Fast check - linting and quick tests only
 check: fastcheck
-    uv run -m pytest -m "not slow"
+    XLA_PYTHON_CLIENT_PREALLOCATE=false uv run -m pytest -n auto -m "not slow"
 
 # Slow check - all tests including slow ones
 slowcheck: fastcheck
-    uv run -m pytest
+    XLA_PYTHON_CLIENT_PREALLOCATE=false uv run -m pytest -n auto
 
 # Create venv and install all dependencies from uv.lock
 setup:
@@ -20,7 +20,7 @@ format:
 
 # Test specific modules/tests using pattern matching
 test pattern: fastcheck
-    uv run -m pytest -k "{{pattern}}"
+    XLA_PYTHON_CLIENT_PREALLOCATE=false uv run -m pytest -n auto -k "{{pattern}}"
 
 # Quick test - same as check
 quicktest: check
