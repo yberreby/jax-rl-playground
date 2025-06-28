@@ -6,7 +6,7 @@ from src.init import sparse_init
 
 
 class GaussianPolicy(nnx.Module):
-    def __init__(self, obs_dim: int, action_dim: int, hidden_dim: int = 64, rngs: nnx.Rngs | None = None):
+    def __init__(self, obs_dim: int, action_dim: int, hidden_dim: int = 64, use_layernorm: bool = True, rngs: nnx.Rngs | None = None):
         if rngs is None:
             rngs = nnx.Rngs(0)
         
@@ -19,20 +19,28 @@ class GaussianPolicy(nnx.Module):
         self.w2 = nnx.Param(sparse_init(key2, (hidden_dim, action_dim), sparsity=0.5))
         self.b2 = nnx.Param(jnp.zeros(action_dim))
         
+        # Store use_layernorm flag
+        self.use_layernorm = use_layernorm
+        
         # LayerNorm WITHOUT learnable parameters (as per paper)
-        self.layer_norm = nnx.LayerNorm(
-            num_features=hidden_dim,
-            use_bias=False,
-            use_scale=False,
-            rngs=rngs
-        )
+        if use_layernorm:
+            self.layer_norm = nnx.LayerNorm(
+                num_features=hidden_dim,
+                use_bias=False,
+                use_scale=False,
+                rngs=rngs
+            )
         
         # Fixed log std for now
         self.log_std = nnx.Param(jnp.full(action_dim, -1.0))
     
     def __call__(self, obs: Float[Array, "batch obs_dim"]) -> tuple[Float[Array, "batch act_dim"], Float[Array, "batch act_dim"]]:
         h = obs @ self.w1.value + self.b1.value
-        h = self.layer_norm(h)  # LayerNorm on pre-activations (no learnable params)
+        
+        # Apply LayerNorm only if enabled
+        if self.use_layernorm:
+            h = self.layer_norm(h)  # LayerNorm on pre-activations (no learnable params)
+        
         h = jax.nn.relu(h)
         
         mean = h @ self.w2.value + self.b2.value

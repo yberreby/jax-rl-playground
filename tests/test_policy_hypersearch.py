@@ -33,12 +33,14 @@ def train_policy_with_params(
     """Train a policy with given hyperparameters and return final loss."""
     key = jax.random.PRNGKey(seed)
     
-    # Create policy
-    policy = GaussianPolicy(obs_dim=4, action_dim=2, hidden_dim=hidden_dim, rngs=nnx.Rngs(key))
-    
-    # Disable LayerNorm if requested (hacky but works)
-    if not use_layernorm:
-        policy.layer_norm = lambda x: x  # Identity function
+    # Create policy with use_layernorm parameter
+    policy = GaussianPolicy(
+        obs_dim=4, 
+        action_dim=2, 
+        hidden_dim=hidden_dim, 
+        use_layernorm=use_layernorm,
+        rngs=nnx.Rngs(key)
+    )
     
     # Select optimizer
     if optimizer_name == "adam":
