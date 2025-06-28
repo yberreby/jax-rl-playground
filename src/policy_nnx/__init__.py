@@ -3,10 +3,12 @@ import jax.numpy as jnp
 from flax import nnx
 from jaxtyping import Array, Float
 from src.init import sparse_init
+from src.distributions import gaussian_log_prob
+from src.constants import DEFAULT_SPARSITY, INITIAL_LOG_STD, DEFAULT_HIDDEN_DIM
 
 
 class GaussianPolicy(nnx.Module):
-    def __init__(self, obs_dim: int, action_dim: int, hidden_dim: int = 64, use_layernorm: bool = True, rngs: nnx.Rngs | None = None):
+    def __init__(self, obs_dim: int, action_dim: int, hidden_dim: int = DEFAULT_HIDDEN_DIM, use_layernorm: bool = True, rngs: nnx.Rngs | None = None):
         if rngs is None:
             rngs = nnx.Rngs(0)
         
@@ -14,9 +16,9 @@ class GaussianPolicy(nnx.Module):
         key1, key2 = jax.random.split(rngs())
         
         # Initialize weights with sparse init
-        self.w1 = nnx.Param(sparse_init(key1, (obs_dim, hidden_dim), sparsity=0.5))
+        self.w1 = nnx.Param(sparse_init(key1, (obs_dim, hidden_dim), sparsity=DEFAULT_SPARSITY))
         self.b1 = nnx.Param(jnp.zeros(hidden_dim))
-        self.w2 = nnx.Param(sparse_init(key2, (hidden_dim, action_dim), sparsity=0.5))
+        self.w2 = nnx.Param(sparse_init(key2, (hidden_dim, action_dim), sparsity=DEFAULT_SPARSITY))
         self.b2 = nnx.Param(jnp.zeros(action_dim))
         
         # Store use_layernorm flag
@@ -32,7 +34,7 @@ class GaussianPolicy(nnx.Module):
             )
         
         # Fixed log std for now
-        self.log_std = nnx.Param(jnp.full(action_dim, -1.0))
+        self.log_std = nnx.Param(jnp.full(action_dim, INITIAL_LOG_STD))
     
     def __call__(self, obs: Float[Array, "batch obs_dim"]) -> tuple[Float[Array, "batch act_dim"], Float[Array, "batch act_dim"]]:
         h = obs @ self.w1.value + self.b1.value
@@ -63,7 +65,6 @@ def sample_actions(
     actions = mean + std * eps
     
     # Compute log probs
-    from src.distributions import gaussian_log_prob
     log_probs = gaussian_log_prob(actions, mean, std)
     
     return actions, log_probs
