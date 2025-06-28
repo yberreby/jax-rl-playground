@@ -1,16 +1,16 @@
 import jax.numpy as jnp
 import optax
 from flax import nnx
-from src.policy_nnx import GaussianPolicy
+from tests.fixtures import create_test_policy, create_test_data
+from tests.constants import DEFAULT_LEARNING_RATE
+from tests.common_patterns import create_loss_fn
 
 
 def test_gradients_exist():
-    """Gradients should be non-zero for a simple loss."""
-    policy = GaussianPolicy(obs_dim=4, action_dim=2)
+    policy = create_test_policy()
+    _, obs, targets = create_test_data(batch_size=1)
     
-    def loss_fn(policy):
-        mean, _ = policy(jnp.ones((1, 4)))
-        return jnp.sum(mean ** 2)
+    loss_fn = create_loss_fn(obs, targets)
     
     _, grads = nnx.value_and_grad(loss_fn)(policy)
     
@@ -27,15 +27,13 @@ def test_gradients_exist():
 
 
 def test_parameters_update():
-    """Parameters should change after optimizer step."""
-    policy = GaussianPolicy(obs_dim=4, action_dim=2)
-    optimizer = nnx.Optimizer(policy, optax.sgd(1.0))
+    policy = create_test_policy()
+    optimizer = nnx.Optimizer(policy, optax.sgd(DEFAULT_LEARNING_RATE))
     
     w1_before = policy.w1.value.copy()
     
-    def loss_fn(policy):
-        mean, _ = policy(jnp.ones((1, 4)))
-        return jnp.sum(mean ** 2)
+    _, obs, targets = create_test_data(batch_size=1)
+    loss_fn = create_loss_fn(obs, targets)
     
     _, grads = nnx.value_and_grad(loss_fn)(policy)
     optimizer.update(grads)
