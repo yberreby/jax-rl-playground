@@ -5,7 +5,9 @@ from src.constants import DEFAULT_SPARSE_INIT_SPARSITY
 
 
 def sparse_init(
-    key: PRNGKeyArray, shape: tuple[int, ...], sparsity: float = DEFAULT_SPARSE_INIT_SPARSITY
+    key: PRNGKeyArray,
+    shape: tuple[int, ...],
+    sparsity: float = DEFAULT_SPARSE_INIT_SPARSITY,
 ) -> Float[Array, "..."]:
     fan_in = shape[-1] if len(shape) >= 2 else 1
     scale = 1.0 / jnp.sqrt(fan_in)

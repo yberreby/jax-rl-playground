@@ -9,7 +9,7 @@ def create_study(
 ) -> optuna.Study:
     if storage is None:
         storage = f"sqlite:///tests/outputs/{study_name}.db"
-    
+
     return optuna.create_study(
         study_name=study_name,
         direction=direction,

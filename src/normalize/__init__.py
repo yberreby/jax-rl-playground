@@ -6,7 +6,9 @@ from src.constants import DEFAULT_EPSILON, DEFAULT_CLIP_VALUE
 
 @jax.jit
 def normalize_obs(
-    obs: Float[Array, "... obs_dim"], epsilon: float = DEFAULT_EPSILON, clip_value: float = DEFAULT_CLIP_VALUE
+    obs: Float[Array, "... obs_dim"],
+    epsilon: float = DEFAULT_EPSILON,
+    clip_value: float = DEFAULT_CLIP_VALUE,
 ) -> Float[Array, "... obs_dim"]:
     mean = jnp.mean(obs, axis=-1, keepdims=True)
     var = jnp.var(obs, axis=-1, keepdims=True)
