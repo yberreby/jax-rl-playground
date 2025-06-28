@@ -182,6 +182,7 @@ These details make the difference between working and non-working implementation
 - `src/reinforce`: REINFORCE loss (takes policy function as argument)
 - `src/distributions`: Gaussian log probability calculation
 - `src/policy_nnx`: Flax NNX policy implementation
+- `src/hypersearch`: Optuna hyperparameter search utilities
 
 ## Key Design Decisions
 - REINFORCE loss is decoupled from policy implementation - takes a JIT'd policy function
@@ -215,6 +216,20 @@ These details make the difference between working and non-working implementation
   3. Simple isolated test first before complex integration
 - Create minimal gradient flow tests to isolate issues
 - Test outputs should go to `tests/outputs/` (plots, CSVs)
+
+## Optuna Ask-and-Tell Pattern for JAX vmap
+- Use `study.ask()` to get multiple trials at once
+- Vectorize evaluation with `jax.vmap` over hyperparameters
+- Use `study.tell()` to report results back
+- This is much more efficient than Optuna's default parallelization
+- Example in `tests/test_ask_tell_vmap.py`
+
+## Hyperparameter Search Findings
+- For simple supervised learning: lr ~0.02, sparsity ~0.8-0.85 work well
+- Text output > plots for LLM analysis (save tokens)
+- Examine CSVs directly with grep/sort for quick insights
+- LayerNorm without learnable params can hurt on simple tasks
+- JIT compilation crucial: use @nnx.jit on train_step
 
 ## Known Issues to Address
 - Magic numbers need to be extracted as constants
