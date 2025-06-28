@@ -237,6 +237,34 @@ These details make the difference between working and non-working implementation
 - Research files in root directory should be moved
 - Inline tests in implementation files need moving to test.py
 
+# Meta Methodological Points
+
+## Code Writing Discipline
+- Write MINIMAL code first, test it, THEN expand
+- If something doesn't work after 2-3 attempts, DELETE IT
+- Unused functions = immediate red flag, remove them
+- Start with POC, extract utilities only after proven useful
+- Smaller commits > large commits (split by concern)
+
+## Testing Approach  
+- Test IMMEDIATELY after writing even 10 lines
+- If tests take >20s, add @pytest.mark.slow
+- Maintain fast feedback loop with `just check`
+- Text output > plots for LLM analysis (save tokens)
+
+## Common Mistakes to Avoid
+- Writing utilities before they're needed
+- Keeping broken/overcomplicated code
+- Large monolithic commits
+- Not running tests frequently enough
+- Generating plots when CSV/text would suffice
+
+## When User Gives Feedback
+- Document it immediately in CLAUDE.md
+- Look for patterns in repeated feedback
+- Adjust approach before continuing
+- Ask for clarification if unsure
+
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
