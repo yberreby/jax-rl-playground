@@ -26,6 +26,7 @@ dependencies = [
     "ipympl>=0.9.7",
     "jupytext>=1.17.2",
     "pandas>=2.3.0",
+    "optuna>=4.4.0",
 ]
 
 [project.urls]
