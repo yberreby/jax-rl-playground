@@ -43,7 +43,9 @@ lint.ignore = ["F821", "F722"]
 dev = [
     "jax-ml-template",
     "pre-commit>=4.2.0",
+    "py>=1.11.0",
     "pytest>=8.4.1",
+    "pytest-parallel>=0.1.1",
     "pytest-xdist>=3.7.0",
     "richbench>=1.0.3",
     "ruff>=0.12.0",
