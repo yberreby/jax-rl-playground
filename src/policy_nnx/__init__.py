@@ -3,7 +3,6 @@ import jax.numpy as jnp
 from flax import nnx
 from jaxtyping import Array, Float
 from src.init import sparse_init
-from src.normalize import normalize_obs
 
 
 class GaussianPolicy(nnx.Module):
@@ -20,12 +19,20 @@ class GaussianPolicy(nnx.Module):
         self.w2 = nnx.Param(sparse_init(key2, (hidden_dim, action_dim), sparsity=0.5))
         self.b2 = nnx.Param(jnp.zeros(action_dim))
         
+        # LayerNorm WITHOUT learnable parameters (as per paper)
+        self.layer_norm = nnx.LayerNorm(
+            num_features=hidden_dim,
+            use_bias=False,
+            use_scale=False,
+            rngs=rngs
+        )
+        
         # Fixed log std for now
         self.log_std = nnx.Param(jnp.full(action_dim, -1.0))
     
     def __call__(self, obs: Float[Array, "batch obs_dim"]) -> tuple[Float[Array, "batch act_dim"], Float[Array, "batch act_dim"]]:
         h = obs @ self.w1.value + self.b1.value
-        h = normalize_obs(h)  # LayerNorm on pre-activations
+        h = self.layer_norm(h)  # LayerNorm on pre-activations (no learnable params)
         h = jax.nn.relu(h)
         
         mean = h @ self.w2.value + self.b2.value
