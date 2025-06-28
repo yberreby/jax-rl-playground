@@ -1,19 +1,33 @@
-Check README.md for details.
+This project was initialized from a template.
+
+Begin every session by checking
+- justfile
+- README.md
+
+# Research Philosophy
+
+Quality > quantity, carefulness over speed, paranoid checking over "it runs, next".
+
+Start simple (naked REINFORCE) before adding complexity. Don't jump into advanced methods until necessity is proven.
 
 # General Methodology
 
 Code like a hacker: concisely, with self-doubt, without fluff, without repeating yourself, keeping code as orthogonal as possible.
 
-## DRY
+## DRY - Apply OBSESSIVELY
 - Repeating oneself is unacceptable.
 - If your LOCs look suspiciously similar, consider a loop or a lambda.
 - If you can refactor to follow a "data-driven" approach (e.g. list of dicts instead of ad-hoc code), consider doing so.
 - Don't be afraid of using tiny, local abstractions.
+- Apply DRY even in tests - factor out setup, use named constants
+- No magic numbers - name everything (TEST_MATRIX_SIZE, TOLERANCE, etc.)
+- Domain knowledge stays in ONE place
 
 ## The Cost of Code
 - Every line of code has a cost.
 - Code, by itself, has no value.
 - Code that has been verified abundantly, through unit and integration tests, might have some value.
+- The fewer LOCs the better - use git instead of duplicating versions
 
 ## Breaking Things That Work
 - If you're afraid of breaking something that currently works, it's probably too brittle, so you should break it.
@@ -23,26 +37,136 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - Purity is good. Testability is good.
 - A one-line function is better than repeating a complex line twice.
 
-## Comments
-- Code should be self-documenting using clear variable names and function names.
-- If you *need* comments to explain the "what" or "how", that's usually a red flag.
-- Comments are there for "business" logic / field-specific knowledge.
+## Documentation Philosophy
+- NO docstrings unless code is "200% done, long-validated"
+- Code should be self-documenting using:
+  - Clear variable and function names
+  - Intermediate variables to break up complex expressions
+  - Type annotations (always!)
+  - Shape annotations with jaxtyping
+- Comments are ONLY for domain-specific knowledge or core algorithms (e.g. REINFORCE math)
+- If you *need* comments to explain the "what" or "how", that's usually a red flag
 
 ## Classes
 - Prefer naked pure functions over classes whenever possible.
 - Only use stateful constructs if it is clearly the idiomatic, sensible thing to do.
 
-## Workflow
-- Plan out API -> Write a test -> Write implementation -> Lint and run test -> Assess
-- Start with something basic, get it to work, refactor early, often, aggressively.
+# Testing Philosophy
+
+## Immediate Testing
+- Write tests IMMEDIATELY after writing even 10 lines
+- Tests can start inline (def test_* right after function)
+- If complexity grows without tests, nuke untested parts and simplify
+- Ensure changes WORK before moving to next task
+
+## Learning Dynamics Testing
+- Write "mini-tests" for LEARNING DYNAMICS, not just correctness
+- If you claim something helps optimization, TEST IT:
+  - Run 10-1000 gradient steps on test problems
+  - Running gradient steps on even 100k-dimensional tensors is cheap
+- Example: Test that sparse init reduces interference
+- Example: Test that normalization maintains stable gradients
+- Tests should produce:
+  - Plots for human analysis (save to tests/outputs/ or similar)
+  - CSVs for follow-up analysis
+  - Don't clutter main directory
+
+## Test Organization
+- Many small tests with FACTORED setup
+- Well-named test functions
+- When tests fail, ask WHY you got it wrong, not just how to fix
+- Comments in tests like "should" go in assert messages for reporting
+
+## Test Commands
+- ALWAYS use `just check` or `just quick` - NEVER point pytest directly at files
+- Use `just test <pattern>` or `uv run -m pytest -k "<pattern>"` for isolated testing
+- Use pytest markers for categorization:
+  - `@pytest.mark.slow` for expensive tests
+  - Run quick tests with `-m "not slow"`
+
+# Code Organization
+
+## Module Structure
+- Modules as directories: `src/module/__init__.py` + `src/module/test.py`
+- Small files (30-150 lines)
+- As many small files as needed
+- tests/ directory for PUBLIC API testing only
+- Implementation tests stay with modules
+
+## File Organization
+- No example scripts - integration tests serve this purpose
+- Throwaway/experimental scripts go in dedicated directory (scripts/, experiments/), not top level
+- Don't clutter
+
+## Public API
+- Define public API in src/__init__.py with __all__
+- Separate implementation tests from behavior tests
+- Integration tests test the public API
+
+# Development Workflow
+
+## Command Workflow
+- ALWAYS run `just check` before any execution
+- Chain commands: `just check; uv run myfile.py`
+- Get feedback from environment FREQUENTLY
+- Don't waste edits on trivial changes (e.g. removing single comments)
+- Shortest path to working code following guidelines
+
+## Dependency Management
+- Use `uv add <package>` to add dependencies, not editing pyproject.toml
+- Use `uv run` to execute code
 
 # Python-specific points
 - Use `uv run myfile.py` or `uv run -m` to run code
+- Check online documentation before using APIs (especially Flax)
 
 # JAX-specific points
 
-- Efficient tensor operations should be thought out in advance.
-- Use `static_argnames` instead of `static_argnums` whenever possible.
-- Note that JIT'd functions can take other JIT'd functions as arguments. Remember, also, that `tree_util.Partial` exists.
-- Remember that Python control flow = static unrolling. This might be what you want, but often, it isn't.
-- If a piece of code is meant to be fast, it should be profiled/benchmarked.
+## Performance
+- Efficient tensor operations should be thought out in advance
+- Use `static_argnames` instead of `static_argnums` whenever possible
+- JIT'd functions can take other JIT'd functions as arguments
+- Remember that Python control flow = static unrolling
+- If code is meant to be fast, it should be profiled/benchmarked
+
+## JAX Workflow
+- Disable GPU preallocation: set `XLA_PYTHON_CLIENT_PREALLOCATE=false`
+- Always check if slowness is from JIT compilation vs runtime
+- Use `block_until_ready()` when timing operations
+- First call includes JIT compilation, subsequent calls are fast
+
+# Deep RL Implementation Details
+
+When implementing deep RL algorithms, the following details are CRITICAL:
+
+## Normalization
+- Observation normalization: standard (obs - mean) / sqrt(var + eps), then clip at ±5
+- Update normalization stats ONLY on real environment steps, NOT during rollouts
+- For reward scaling: track discounted returns (u_t = r_t + γ(1-T_t)u_{t-1}), scale by their std, NO centering
+
+## Initialization
+- Key goal: Reduce interference and maintain proper scaling
+- Elsayed used sparse init (90% zeros, 1/√fan_in scaling) but orthogonal or other approaches may work
+- Don't assume sparse is necessary - validate empirically
+
+## Architecture
+- Use LayerNorm WITHOUT learnable parameters before each activation
+- Apply to pre-activations: φ(a) = (a - μ) / √(σ² + ε)
+
+## Implementation Approach
+- Start with BATCH versions, not streaming (simpler, still captures key ideas)
+- Begin with naked REINFORCE, then add simple baselines incrementally
+- The paper's insights apply to batch too: normalize obs, scale rewards by return std, layer norm, proper init
+
+These details make the difference between working and non-working implementations.
+
+# Important Reminders
+
+- Quality > Quantity
+- Test immediately and frequently
+- DRY obsessively
+- No docstrings until "200% done"
+- Use intermediate variables for clarity
+- Always run `just check` before execution
+- Don't clutter with examples or throwaway code
+- Integration tests ARE the examples
