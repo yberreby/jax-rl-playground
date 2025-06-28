@@ -231,6 +231,17 @@ These details make the difference between working and non-working implementation
 - LayerNorm without learnable params can hurt on simple tasks
 - JIT compilation crucial: use @nnx.jit on train_step
 
+## LayerNorm + Sparse Init Interaction
+- LayerNorm amplifies small activations to unit variance
+- With sparse init (scale ~0.1), LayerNorm causes 10-100x amplification
+- This leads to:
+  - Much larger initial loss (10-25x)
+  - Much larger gradients (10-25x)
+  - Potential training instability
+- The issue is worst at intermediate sparsity (0.5-0.8)
+- At very high sparsity (0.95), the effect is reduced
+- This explains why LayerNorm appeared to hurt in simple tests
+
 ## Known Issues to Address
 - Magic numbers need to be extracted as constants
 - Test setup code needs factoring to reduce duplication
