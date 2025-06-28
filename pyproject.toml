@@ -1,7 +1,7 @@
 [project]
-name = "jax-ml-template"
+name = "jax-rl-demo"
 version = "0.1.0"
-description = "A JAX-based ML project."
+description = "JAX RL Demo"
 readme = "README.md"
 license-files = ["LICEN[CS]E*"]
 requires-python = ">=3.12"
@@ -30,10 +30,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/yberreby/jax-ml-template"
-
-# [tool.uv.sources]
-# jax-ml-template = { workspace = true }
+Repository = "https://github.com/yberreby/jax-rl-demo"
 
 [tool.ruff]
 # Ignore F821 and F722 for jaxtyping string annotations
@@ -41,7 +38,7 @@ lint.ignore = ["F821", "F722"]
 
 [dependency-groups]
 dev = [
-    "jax-ml-template",
+    "jax-rl-demo",
     "pre-commit>=4.2.0",
     "py>=1.11.0",
     "pytest>=8.4.1",
