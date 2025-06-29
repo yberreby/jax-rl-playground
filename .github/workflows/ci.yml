@@ -12,10 +12,10 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.12"]
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Install uv
       uses: astral-sh/setup-uv@v5
       with:
@@ -23,27 +23,21 @@ jobs:
         cache-dependency-glob: |
           **/pyproject.toml
           **/uv.lock
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
-    
+
     - name: Install dependencies with CPU-only JAX
       run: |
+        uv venv
+        uv pip install 'jax[cpu]'
         # Install all dependencies including the project
         uv sync --all-extras --dev
-        # Override with CPU-only JAX
-        uv pip install --force-reinstall "jax[cpu]"
-    
+
     - name: Create test outputs directory
       run: mkdir -p tests/outputs
-    
-    - name: Run checks
-      run: |
-        uv run just check
-      env:
-        XLA_PYTHON_CLIENT_PREALLOCATE: false
-    
-    - name: Run slow tests
+
+    - name: Run all tests and linting
       run: |
         uv run just slowcheck
       env:
