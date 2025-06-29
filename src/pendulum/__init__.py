@@ -62,12 +62,9 @@ def dynamics(
 @jax.jit
 def reward(state: Float[Array, "2"], action: Float[Array, "1"]) -> Float[Array, ""]:
     theta, theta_dot = state
-    torque = action[0]
 
-    position_reward = jnp.cos(theta) - 1.0
-    action_penalty = ACTION_PENALTY_COEF * torque**2
-
-    return position_reward - action_penalty
+    # Simple continuous reward based on height
+    return jnp.cos(theta)
 
 
 @jax.jit

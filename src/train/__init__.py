@@ -5,8 +5,8 @@ from typing import NamedTuple
 from flax import nnx
 import optax
 import equinox as eqx
+from ..policy import sample_actions
 from ..baseline import BaselineState, update_baseline, compute_advantages
-from ..distributions import gaussian_log_prob
 
 
 class TrainState(NamedTuple):
@@ -21,6 +21,7 @@ class EpisodeResult(NamedTuple):
     rewards: Float[Array, "episode_len"]
     returns: Float[Array, "episode_len"]
     total_reward: Float[Array, ""]
+    log_probs: Float[Array, "episode_len"]
 
 
 @jax.jit
@@ -47,10 +48,11 @@ def collect_episode(
         env_state, done = carry
         
         # Sample action from policy
-        obs_batch = env_state.state[None, :]
-        mean, std = policy(obs_batch)
-        eps = jax.random.normal(key, mean.shape)
-        action = (mean + std * eps)[0]
+        action, log_prob = sample_actions(
+            policy, env_state.state[None, :], key
+        )
+        action = action[0]  # Remove batch dimension
+        log_prob = log_prob[0]  # Remove batch dimension
         
         # Step environment
         result = env_step(env_state, action)
@@ -63,7 +65,7 @@ def collect_episode(
         new_done = jnp.maximum(done, result.done)
         
         # Output for this step (current state, not next)
-        output = (env_state.state, action, result.reward * (1.0 - done))
+        output = (env_state.state, action, result.reward * (1.0 - done), log_prob)
         
         return (new_env_state, new_done), output
     
@@ -71,19 +73,23 @@ def collect_episode(
     keys = jax.random.split(key, max_steps)
     
     # Run scan
-    (final_env_state, final_done), (states, actions, rewards) = jax.lax.scan(
+    (final_env_state, final_done), (states, actions, rewards, log_probs) = jax.lax.scan(
         step_fn, (initial_env_state, jnp.array(0.0)), keys
     )
     
     # Compute returns
     returns = compute_returns(rewards)
     
+    # Count actual steps
+    episode_length = jnp.sum(rewards != 0.0)
+    
     return EpisodeResult(
         states=states,
         actions=actions,
         rewards=rewards,
         returns=returns,
-        total_reward=jnp.sum(rewards),
+        total_reward=jnp.sum(rewards) / jnp.maximum(episode_length, 1.0),  # Average
+        log_probs=log_probs,
     )
 
 
@@ -113,16 +119,21 @@ def collect_episodes(
     actions = results.actions.reshape(-1, act_dim)
     rewards = results.rewards.reshape(-1)
     returns = results.returns.reshape(-1)
+    log_probs = results.log_probs.reshape(-1)
     
-    # Keep per-episode totals
-    total_rewards = jax.vmap(jnp.sum)(results.rewards)
+    # Keep per-episode averages
+    # Count non-zero rewards to get episode lengths
+    episode_lengths = jax.vmap(lambda r: jnp.sum(r != 0.0))(results.rewards)
+    episode_sums = jax.vmap(jnp.sum)(results.rewards)
+    episode_averages = episode_sums / jnp.maximum(episode_lengths, 1.0)
     
     return EpisodeResult(
         states=states,
         actions=actions,
         rewards=rewards,
         returns=returns,
-        total_reward=jnp.mean(total_rewards),  # Mean across episodes
+        total_reward=jnp.mean(episode_averages),  # Mean of per-episode averages
+        log_probs=log_probs,
     )
 
 
@@ -136,9 +147,8 @@ def train_step(
 ) -> Float[Array, ""]:
 
     def loss_fn(policy):
-        mean, std = policy(batch_states)
-
-        log_probs = gaussian_log_prob(batch_actions, mean, std)
+        # Use policy's log_prob method
+        log_probs = policy.log_prob(batch_states, batch_actions)
 
         # REINFORCE loss
         return -jnp.mean(log_probs * batch_advantages)
@@ -175,6 +185,11 @@ def train(
         "std_return": [],
         "loss": [],
         "baseline_value": [],
+        "mean_advantage": [],
+        "std_advantage": [],
+        "mean_log_prob": [],
+        "mean_action": [],
+        "std_action": [],
     }
 
     for i in range(n_iterations):
@@ -204,6 +219,9 @@ def train(
 
         # Update policy
         loss = train_step(policy, optimizer, all_states, all_actions, advantages)
+        
+        # Get log probs from the episode data
+        log_probs = episode_batch.log_probs
 
         # Track metrics
         metrics["iteration"].append(i)
@@ -211,10 +229,18 @@ def train(
         metrics["std_return"].append(0.0)  # TODO: track individual episode returns
         metrics["loss"].append(float(loss))
         metrics["baseline_value"].append(float(train_state.baseline.mean))
+        metrics["mean_advantage"].append(float(jnp.mean(advantages)))
+        metrics["std_advantage"].append(float(jnp.std(advantages)))
+        metrics["mean_log_prob"].append(float(jnp.mean(log_probs)))
+        metrics["mean_action"].append(float(jnp.mean(episode_batch.actions)))
+        metrics["std_action"].append(float(jnp.std(episode_batch.actions)))
 
         if verbose and i % 10 == 0:
             print(
-                f"Iter {i:3d} | Return: {metrics['mean_return'][-1]:7.2f} ± {metrics['std_return'][-1]:5.2f} | Loss: {metrics['loss'][-1]:7.4f}"
+                f"Iter {i:3d} | Return: {metrics['mean_return'][-1]:7.2f} | "
+                f"Loss: {metrics['loss'][-1]:10.4f} | "
+                f"Baseline: {metrics['baseline_value'][-1]:7.2f} | "
+                f"Adv: {metrics['mean_advantage'][-1]:6.2f}±{metrics['std_advantage'][-1]:5.2f}"
             )
 
     return metrics

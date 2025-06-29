@@ -2,9 +2,11 @@ import jax
 import jax.numpy as jnp
 from flax import nnx
 from jaxtyping import Array, Float
+import equinox as eqx
 from src.init import sparse_init
 from src.distributions import gaussian_log_prob
 from src.constants import DEFAULT_SPARSITY, INITIAL_LOG_STD, DEFAULT_HIDDEN_DIM
+from src.pendulum import MAX_TORQUE
 
 
 class GaussianPolicy(nnx.Module):
@@ -53,23 +55,56 @@ class GaussianPolicy(nnx.Module):
 
         h = jax.nn.relu(h)
 
+        # Raw unbounded mean
         mean = h @ self.w2.value + self.b2.value
+        
         std = jnp.exp(self.log_std.value)
         # Broadcast std to match batch dimension
         std = jnp.broadcast_to(std, mean.shape)
 
         return mean, std
+    
+    def log_prob(
+        self, 
+        obs: Float[Array, "batch obs_dim"],
+        actions: Float[Array, "batch act_dim"]
+    ) -> Float[Array, "batch"]:
+        """Compute log probability of actions, accounting for tanh squashing."""
+        mean, std = self(obs)
+        
+        # Inverse tanh to get unbounded actions
+        # Clip to avoid numerical issues at boundaries
+        actions_clipped = jnp.clip(actions, -MAX_TORQUE + 1e-6, MAX_TORQUE - 1e-6)
+        unbounded_actions = MAX_TORQUE * jnp.arctanh(actions_clipped / MAX_TORQUE)
+        
+        # Log prob in unbounded space
+        log_probs = gaussian_log_prob(unbounded_actions, mean, std)
+        
+        # Correction for tanh squashing: subtract log|det J|
+        # For a = c*tanh(z/c), we have |det J| = (1 - (a/c)²)
+        log_det_jacobian = jnp.sum(
+            jnp.log(1.0 - (actions_clipped / MAX_TORQUE)**2 + 1e-6), 
+            axis=-1
+        )
+        
+        return log_probs - log_det_jacobian
 
 
-@nnx.jit
+@eqx.filter_jit
 def sample_actions(
     policy: GaussianPolicy, obs: Float[Array, "batch obs_dim"], key: Array
 ) -> tuple[Float[Array, "batch act_dim"], Float[Array, "batch"]]:
+    # Get unbounded mean and std
     mean, std = policy(obs)
 
+    # Sample in unbounded space
     eps = jax.random.normal(key, mean.shape)
-    actions = mean + std * eps
-
-    log_probs = gaussian_log_prob(actions, mean, std)
+    unbounded_actions = mean + std * eps
+    
+    # Apply tanh squashing to bound actions
+    actions = MAX_TORQUE * jnp.tanh(unbounded_actions / MAX_TORQUE)
+    
+    # Use policy's log_prob method for consistency
+    log_probs = policy.log_prob(obs, actions)
 
     return actions, log_probs
