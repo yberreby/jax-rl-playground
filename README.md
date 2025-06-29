@@ -1,34 +1,49 @@
 # jax-rl-playground
 
-This is a WIP environment testing [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)'s ability to implement Reinforcement Learning algorithms/components in JAX and semi-autonomously run small-scale experiments in a disciplined manner.
+A JAX Reinforcement Learning template optimized for LLM-assisted development, particularly with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview).
 
-This has extensive linting, type checking, runtime shape checking, and unit testing.
-Run `uv run just check` for a test run.
+**Fork this to skip the setup and start building RL algorithms in JAX now.**
 
-See `./CLAUDE.md` for more.
+Prerequisite: [`uv`](https://github.com/astral-sh/uv). Other tools (`ruff`, `just`, `ty`...) will be installed automatically through `uv`.
 
-Tested on Arch Linux with a CUDA environment (RTX 4060).
+## ✅ What's Included
 
-## Correctness philosophy
+### Infrastructure
+- [x] [`uv`](https://github.com/astral-sh/uv)-first setup
+- [x] GitHub Actions CI (automated testing on every push)
+- [x] [`justfile`](https://github.com/casey/just) commands
+- [x] pytest tests with parallel execution and slow test markers
+- [x] Static type checking with [`ty`](https://github.com/astral-sh/ty)
+- [x] Runtime shape checking with [`jaxtyping`](https://github.com/patrick-kidger/jaxtyping) + [`beartype`](https://github.com/beartype/beartype)
 
-At any given point, all tests on the `master` branch should pass.
-The point here is largely to streamline the use of LLMs to accelerate experimentation, but with added speed of execution comes a greater risk of errors.
-In order to alleviate this issue, the focus here is on fast automated verification.
-Don't trust your LLM (nor yourself!) to write correct code; instead, (make it) break down problems into small, well-tested subcomponents.
-Even so, conceptual errors might remain; exercise caution.
+### LLM Optimization
+- [x] Comprehensive CLAUDE.md with coding methodology
+- [x] Test-driven approach that catches AI mistakes early
+- [x] Working JAX examples
 
-## Why should I care?
+## 🚀 Quick Start
 
-Testing, packaging, sensible defaults for CLAUDE.md have been set up for you.
-A tight feedback loop and a coding methodology make the use of Claude Code or similar agentic systems more useful when tackling research questions.
-Example code makes it easier for the agent to understand how it should code. This is especially important for newer JAX APIs.
+```bash
+git clone https://github.com/yberreby/jax-rl-playground
+cd jax-rl-playground
+uv sync
+uv run just
+```
 
-## Based on `jax-ml-template`
+## 💡 Key Benefits
 
-This project was originally initialized from [@yberreby/jax-ml-template](https://github.com/yberreby/jax-ml-template).
+- **No setup required** - CI/CD, testing, linting all pre-configured
+- **AI-friendly** - Clear patterns and immediate feedback
+- **Research-oriented** - Test learning dynamics with `slow` tests
+
+## 📚 Philosophy
+
+- **Correctness first** - All tests pass on `master`
+- **Test immediately** - Even for 10 lines of code
+- **Minimal and modular** - Small, testable components
+
+Based on [@yberreby/jax-ml-template](https://github.com/yberreby/jax-ml-template).
 
 ## License
 
-This project is licensed under the MIT License.
-
-See `./LICENSE.md` for details.
+MIT License. See `./LICENSE.md` for details.

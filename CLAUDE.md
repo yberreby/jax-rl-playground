@@ -74,8 +74,8 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 ## Test Commands
 - Check the `./justfile` for up-to-date information
 - Use project-wide test collection with -k, maybe modules, but never point pytest to a .py
-- Use `just check` for full test suite
-- Use `just test <pattern>` or `uv run -m pytest -k "<pattern>"` for isolated testing
+- Use `uv run just check` for most tests
+- Use `uv run just test <pattern>` or `uv run -m pytest -k "<pattern>"` for isolated testing
 - Use pytest markers for categorization:
   - `@pytest.mark.slow` for expensive tests
   - Run quick tests with `-m "not slow"`
@@ -203,7 +203,7 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - JIT compilation crucial: use @nnx.jit on train_step
 - Test IMMEDIATELY after writing even 10 lines
 - If tests take >1-5s, add @pytest.mark.slow
-- Maintain fast feedback loop with `just check`
+- Maintain fast feedback loop with `uv run just check`
 - Text output > plots for LLM analysis (save tokens)
 
 ## Common Mistakes to Avoid
