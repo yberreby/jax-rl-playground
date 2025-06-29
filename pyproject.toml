@@ -30,6 +30,7 @@ dependencies = [
     "pandas>=2.3.0",
     "optuna>=4.4.0",
     "equinox>=0.12.2",
+    "diffrax>=0.7.0",
 ]
 
 [project.urls]
