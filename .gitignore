@@ -24,3 +24,6 @@ tests/outputs/
 
 # JAX compilation cache
 .jax_cache/
+
+# Videos
+*.mp4
