@@ -218,3 +218,7 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - Look for patterns in repeated feedback
 - Adjust approach before continuing
 - Ask for clarification if unsure
+
+## Development Methodology
+- When developing a feature, particularly when trying to make a complex pipeline JIT-compatible, you are encouraged to begin by writing throwaway, self-contained test code to pilot a concept, verify that you understand an API, etc. You can write such code to a throwaway/ directory. You can do as many small scripts as you like to try / understand something, then once you've learned what you needed, state it and remove the throwaway files before moving on to an actual implementation.
+- You are encouraged to do this because it is VERY rarely the case that the first version of a file is the correct one, and rewriting from scratch after gaining insights from real interaction with the problem is usually superior to targeted fixes to a bad first draft.
