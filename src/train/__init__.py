@@ -40,7 +40,6 @@ def collect_episode(
     key: Array,
     max_steps: int = 200,
 ) -> EpisodeResult:
-    """Collect a single episode using JAX scan (JIT-compiled)."""
     key, reset_key = jax.random.split(key)
     initial_env_state = env_reset(reset_key)
     
@@ -97,7 +96,6 @@ def collect_episodes(
     n_episodes: int,
     max_steps: int = 200,
 ) -> EpisodeResult:
-    """Collect multiple episodes in parallel using vmap."""
     keys = jax.random.split(key, n_episodes)
     
     # vmap over episodes
@@ -109,8 +107,10 @@ def collect_episodes(
     results = vmapped_collect(keys)
     
     # Flatten batch dimension for training
-    states = results.states.reshape(-1, 2)
-    actions = results.actions.reshape(-1, 1)
+    obs_dim = results.states.shape[-1]
+    act_dim = results.actions.shape[-1]
+    states = results.states.reshape(-1, obs_dim)
+    actions = results.actions.reshape(-1, act_dim)
     rewards = results.rewards.reshape(-1)
     returns = results.returns.reshape(-1)
     
@@ -178,17 +178,18 @@ def train(
     }
 
     for i in range(n_iterations):
-        # Collect episodes
-        episode_results = []
-        for _ in range(episodes_per_iter):
-            train_state = train_state._replace(key=jax.random.split(train_state.key)[0])
-            episode = collect_episode(policy, env_step, env_reset, train_state.key)
-            episode_results.append(episode)
-
-        # Aggregate data
-        all_states = jnp.concatenate([ep.states for ep in episode_results])
-        all_actions = jnp.concatenate([ep.actions for ep in episode_results])
-        all_returns = jnp.concatenate([ep.returns for ep in episode_results])
+        # Collect episodes in parallel
+        key, collect_key = jax.random.split(train_state.key)
+        train_state = train_state._replace(key=key)
+        
+        episode_batch = collect_episodes(
+            policy, env_step, env_reset, collect_key, episodes_per_iter
+        )
+        
+        # Data is already aggregated
+        all_states = episode_batch.states
+        all_actions = episode_batch.actions
+        all_returns = episode_batch.returns
 
         # Compute advantages
         if use_baseline:
@@ -205,10 +206,9 @@ def train(
         loss = train_step(policy, optimizer, all_states, all_actions, advantages)
 
         # Track metrics
-        episode_returns = jnp.array([ep.total_reward for ep in episode_results])
         metrics["iteration"].append(i)
-        metrics["mean_return"].append(float(jnp.mean(episode_returns)))
-        metrics["std_return"].append(float(jnp.std(episode_returns)))
+        metrics["mean_return"].append(float(episode_batch.total_reward))
+        metrics["std_return"].append(0.0)  # TODO: track individual episode returns
         metrics["loss"].append(float(loss))
         metrics["baseline_value"].append(float(train_state.baseline.mean))
 

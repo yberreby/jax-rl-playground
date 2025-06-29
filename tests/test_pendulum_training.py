@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
-"""Train a pendulum swing-up policy using REINFORCE with JIT/vmap optimization."""
+# Test pendulum training with REINFORCE using JIT/vmap optimization
 
 import jax
 import jax.numpy as jnp
 from flax import nnx
 import optax
 import time
+import pytest
 from src.policy import GaussianPolicy
 from src.pendulum import step, reset_env
 from src.train import collect_episode, collect_episodes, train_step
@@ -23,20 +23,6 @@ def train_pendulum(
     seed: int = 42,
     verbose: bool = True,
 ):
-    """Train pendulum swing-up using REINFORCE.
-    
-    Args:
-        n_iterations: Number of training iterations
-        episodes_per_iter: Episodes to collect per iteration
-        learning_rate: Adam learning rate
-        use_baseline: Whether to use a baseline for variance reduction
-        use_parallel: Whether to use vmap for parallel episode collection
-        seed: Random seed
-        verbose: Whether to print progress
-    
-    Returns:
-        Dictionary with training metrics and trained policy
-    """
     # Initialize
     key = jax.random.PRNGKey(seed)
     policy = GaussianPolicy(obs_dim=2, action_dim=1, hidden_dim=64)
@@ -136,7 +122,6 @@ def train_pendulum(
 
 
 def evaluate_policy(policy, n_episodes=5, render=True):
-    """Evaluate trained policy and optionally render episodes."""
     key = jax.random.PRNGKey(123)
     
     if render:
@@ -156,8 +141,8 @@ def evaluate_policy(policy, n_episodes=5, render=True):
                 [a for a in episode.actions],
                 [r for r in episode.rewards],
             )
-            animation.save("pendulum_trained.mp4", writer="ffmpeg", fps=20)
-            print("Saved animation to pendulum_trained.mp4")
+            animation.save("tests/outputs/pendulum_trained.mp4", writer="ffmpeg", fps=20)
+            print("Saved animation to tests/outputs/pendulum_trained.mp4")
     
     print(f"\nEvaluation over {n_episodes} episodes:")
     print(f"Mean reward: {jnp.mean(jnp.array(total_rewards)):.2f}")
@@ -165,7 +150,6 @@ def evaluate_policy(policy, n_episodes=5, render=True):
 
 
 def plot_training_curves(metrics):
-    """Plot training curves."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
     
     # Returns
@@ -185,12 +169,11 @@ def plot_training_curves(metrics):
     ax2.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig("pendulum_training_curves.png", dpi=150)
-    print("\nSaved training curves to pendulum_training_curves.png")
+    plt.savefig("tests/outputs/pendulum_training_curves.png", dpi=150)
+    print("\nSaved training curves to tests/outputs/pendulum_training_curves.png")
 
 
 def compare_performance():
-    """Compare performance of sequential vs parallel episode collection."""
     print("=== Performance Comparison ===\n")
     
     # Train with sequential collection
@@ -222,22 +205,63 @@ def compare_performance():
     print(f"\n3. Speedup: {seq_time/par_time:.1f}x")
 
 
-if __name__ == "__main__":
-    # Compare performance
-    compare_performance()
+@pytest.mark.slow
+def test_pendulum_training_performance():
+    # Train with sequential collection
+    result_seq = train_pendulum(
+        n_iterations=10,
+        episodes_per_iter=8,
+        use_parallel=False,
+        verbose=False
+    )
+    seq_time = result_seq["total_time"]
     
-    # Full training run
-    print("\n" + "="*50 + "\n")
-    print("Full training run with parallel collection:")
+    # Train with parallel collection
+    result_par = train_pendulum(
+        n_iterations=10,
+        episodes_per_iter=8,
+        use_parallel=True,
+        verbose=False
+    )
+    par_time = result_par["total_time"]
+    
+    # Parallel should be faster
+    assert par_time < seq_time, f"Parallel ({par_time:.2f}s) not faster than sequential ({seq_time:.2f}s)"
+    assert seq_time / par_time > 1.2, f"Speedup only {seq_time/par_time:.1f}x, expected >1.2x"
+
+
+@pytest.mark.slow
+def test_pendulum_training_convergence():
     result = train_pendulum(
-        n_iterations=100,
-        episodes_per_iter=32,
+        n_iterations=50,
+        episodes_per_iter=16,
         use_parallel=True,
         use_baseline=True,
+        verbose=False,
     )
     
-    # Plot results
-    plot_training_curves(result["metrics"])
+    metrics = result["metrics"]
+    initial_return = metrics["mean_return"][0]
+    final_return = metrics["mean_return"][-1]
     
-    # Evaluate trained policy
-    evaluate_policy(result["policy"], n_episodes=5, render=True)
+    # Should show some improvement (even if not solving the task)
+    assert final_return > initial_return + 10, (
+        f"No significant improvement: {initial_return:.1f} -> {final_return:.1f}"
+    )
+    
+    # Save training curves for inspection
+    plot_training_curves(metrics)
+
+
+@pytest.mark.slow 
+def test_pendulum_visualization():
+    # Quick training run
+    result = train_pendulum(
+        n_iterations=20,
+        episodes_per_iter=16,
+        use_parallel=True,
+        verbose=False,
+    )
+    
+    # Evaluate and render
+    evaluate_policy(result["policy"], n_episodes=1, render=True)

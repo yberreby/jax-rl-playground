@@ -191,6 +191,24 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - Use `study.tell()` to report results back
 - Example in `tests/test_ask_tell_vmap.py`
 
+# JAX-specific Performance Patterns
+
+## Episode Collection
+- NEVER use Python loops for episode collection - use jax.lax.scan
+- Always make episode collection JIT-compilable from the start
+- Use vmap for parallel episode collection across different initial conditions
+- Example: collect_episode should use scan, collect_episodes should vmap over collect_episode
+
+## Module JIT Compatibility
+- Use equinox.filter_jit for functions that take NNX modules as arguments
+- This handles PyTree filtering automatically
+- Don't try to use static_argnames with NNX modules - use eqx.filter_jit instead
+
+## Performance Expectations
+- Single episode collection with scan: ~20-30x faster than Python loops
+- Parallel collection with vmap: additional 1.5-2x speedup per batch
+- Always benchmark before assuming something is slow (e.g., diffrax is fine for pendulum dynamics)
+
 # Meta Methodological Points
 
 ## Code Writing Discipline
