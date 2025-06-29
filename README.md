@@ -1,6 +1,6 @@
 # jax-rl-playground
 
-A JAX Reinforcement Learning template optimized for LLM-assisted development, particularly with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview).
+A JAX Reinforcement Learning template, speeding up humans and optimized for LLM-assisted development with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview).
 
 **Fork this to skip the setup and start building RL algorithms in JAX now.**
 
