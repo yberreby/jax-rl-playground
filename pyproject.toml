@@ -29,6 +29,7 @@ dependencies = [
     "jupytext>=1.17.2",
     "pandas>=2.3.0",
     "optuna>=4.4.0",
+    "equinox>=0.12.2",
 ]
 
 [project.urls]
