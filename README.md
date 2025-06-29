@@ -6,6 +6,8 @@ A JAX Reinforcement Learning template optimized for LLM-assisted development, pa
 
 Prerequisite: [`uv`](https://github.com/astral-sh/uv). Other tools (`ruff`, `just`, `ty`...) will be installed automatically through `uv`.
 
+If you don't have a recent NVIDIA GPU, see `pyproject.toml` to use `jax[cpu]` instead of `jax[cuda12]`.
+
 ## ✅ What's Included
 
 ### Infrastructure
