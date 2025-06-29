@@ -1,7 +1,7 @@
 [project]
-name = "jax-rl-demo"
+name = "jax-rl-playground"
 version = "0.1.0"
-description = "JAX RL Demo"
+description = "JAX RL Playground"
 readme = "README.md"
 license-files = ["LICEN[CS]E*"]
 requires-python = ">=3.12"
@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/yberreby/jax-rl-demo"
+Repository = "https://github.com/yberreby/jax-rl-playground"
 
 [tool.ruff]
 # Ignore F821 and F722 for jaxtyping string annotations
@@ -38,7 +38,7 @@ lint.ignore = ["F821", "F722"]
 
 [dependency-groups]
 dev = [
-    "jax-rl-demo",
+    "jax-rl-playground",
     "pre-commit>=4.2.0",
     "py>=1.11.0",
     "pytest>=8.4.1",

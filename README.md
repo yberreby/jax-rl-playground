@@ -1,4 +1,4 @@
-# jax-rl-demo
+# jax-rl-playground
 
 This is a WIP environment testing [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)'s ability to implement Reinforcement Learning algorithms/components in JAX and semi-autonomously run small-scale experiments in a disciplined manner.
 
