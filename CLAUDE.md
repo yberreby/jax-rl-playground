@@ -118,6 +118,7 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 
 ## Performance
 - Efficient tensor operations should be thought out in advance
+- You can use `@eqx.filter_jit` (`import equinox as eqx` first) to sidestep most issues with `@jax.jit`
 - Use `static_argnames` instead of `static_argnums` whenever possible
 - JIT'd functions can take other JIT'd functions as arguments
 - Remember that Python control flow = static unrolling
