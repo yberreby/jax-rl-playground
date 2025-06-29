@@ -14,6 +14,7 @@ If you don't have a recent NVIDIA GPU, see `pyproject.toml` to use `jax[cpu]` in
 - [x] [`uv`](https://github.com/astral-sh/uv)-first setup
 - [x] GitHub Actions CI (automated testing on every push)
 - [x] [`justfile`](https://github.com/casey/just) commands
+- [x] [`ruff`](https://github.com/astral-sh/ruff) linting and formatting
 - [x] pytest tests with parallel execution and slow test markers
 - [x] Static type checking with [`ty`](https://github.com/astral-sh/ty)
 - [x] Runtime shape checking with [`jaxtyping`](https://github.com/patrick-kidger/jaxtyping) + [`beartype`](https://github.com/beartype/beartype)
