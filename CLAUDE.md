@@ -123,7 +123,8 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - JIT'd functions can take other JIT'd functions as arguments
 - Remember that Python control flow = static unrolling
 - If code is meant to be fast, it should be profiled/benchmarked
-- Use `block_until_ready()` when timing operations to separate JIT compilation from runtime
+- Use `block_until_ready()` when timing operations, because of async dispatch
+- Don't forget that JIT compilation is time-consuming but only happens rarely/once
 
 ## JAX Workflow
 - Disable GPU preallocation: set `XLA_PYTHON_CLIENT_PREALLOCATE=false`
