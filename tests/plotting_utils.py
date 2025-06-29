@@ -2,7 +2,10 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Dict, List, Any
 from tests.constants import OUTPUT_DIR, FIGURE_DPI
-from tests.csv_utils import ensure_output_dir
+
+
+def ensure_output_dir():
+    Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 
 def create_training_plots(

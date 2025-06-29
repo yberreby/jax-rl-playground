@@ -2,11 +2,11 @@
 check: fastcheck
     XLA_PYTHON_CLIENT_PREALLOCATE=false uv run -m pytest -n auto -m "not slow"
 
-# Single process check - faster due to JIT cache sharing
+# Single process check
 singlecheck: fastcheck
     XLA_PYTHON_CLIENT_PREALLOCATE=false uv run -m pytest -m "not slow"
 
-# Thread-based check - single process with multiple threads (best of both worlds)
+# Thread-based check - single process with multiple threads
 threadcheck: fastcheck
     XLA_PYTHON_CLIENT_PREALLOCATE=false uv run -m pytest --workers 1 --tests-per-worker auto -m "not slow"
 
@@ -14,21 +14,18 @@ threadcheck: fastcheck
 slowcheck: fastcheck
     XLA_PYTHON_CLIENT_PREALLOCATE=false uv run -m pytest -n auto
 
-# Create venv and install all dependencies from uv.lock
-setup:
-    uv sync
-
-# Linting and type checking
-fastcheck: setup
-    ruff check --fix
-    uvx ty check
-
-format:
-    ruff format
-
 # Test specific modules/tests using pattern matching
 test pattern: fastcheck
     XLA_PYTHON_CLIENT_PREALLOCATE=false uv run -m pytest -n auto -k "{{pattern}}"
 
-# Quick test - same as check
-quicktest: check
+# Linting and type checking
+fastcheck: setup
+    uv run ruff check --fix
+    uvx ty check
+
+# Create venv and install all dependencies from uv.lock
+setup:
+    uv sync
+
+format:
+    uv run ruff format

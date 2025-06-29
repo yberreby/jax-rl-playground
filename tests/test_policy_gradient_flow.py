@@ -1,8 +1,8 @@
 import jax.numpy as jnp
 import optax
 from flax import nnx
-from src.policy_nnx import GaussianPolicy
-from tests.common_patterns import create_loss_fn
+from src.policy import GaussianPolicy
+from tests.utils import create_loss_fn
 
 
 def test_policy_gradient_step():

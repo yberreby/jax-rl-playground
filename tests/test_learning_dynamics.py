@@ -5,7 +5,7 @@ import pytest
 import matplotlib.pyplot as plt
 import pandas as pd
 from flax import nnx
-from src.policy_nnx import GaussianPolicy
+from src.policy import GaussianPolicy
 
 
 @pytest.mark.slow

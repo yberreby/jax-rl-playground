@@ -1,14 +1,8 @@
-This project was initialized from a template.
-
-Begin every session by checking
-- justfile
-- README.md
-
 # Research Philosophy
 
 Quality > quantity, carefulness over speed, paranoid checking over "it runs, next".
 
-Start simple (naked REINFORCE) before adding complexity. Don't jump into advanced methods until necessity is proven.
+Start simple before adding complexity. Don't jump into advanced methods until something simpler runs, and necessity is established.
 
 # General Methodology
 
@@ -91,17 +85,15 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 ## Module Structure
 - Modules as directories: `src/module/__init__.py` + `src/module/test.py`
 - Small files (30-150 lines)
-- As many small files as needed
+- As many small modules and submodules as needed/appropriate
 - tests/ directory for PUBLIC API testing only
-- Implementation tests stay with modules
+- Implementation tests stay within modules
 
 ## File Organization
 - No example scripts - integration tests serve this purpose
-- Throwaway/experimental scripts go in dedicated directory (scripts/, experiments/), not top level
-- Don't clutter
+- Throwaway/experimental scripts and outputs should go in dedicated directory, not top level
 
 ## Public API
-- Define public API in src/__init__.py with __all__
 - Separate implementation tests from behavior tests
 - Integration tests test the public API
 
@@ -138,31 +130,6 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - Use `block_until_ready()` when timing operations
 - First call includes JIT compilation, subsequent calls are fast
 
-# Deep RL Implementation Details
-
-When implementing deep RL algorithms, the following details are CRITICAL:
-
-## Normalization
-- Observation normalization: standard (obs - mean) / sqrt(var + eps), then clip at ±5
-- Update normalization stats ONLY on real environment steps, NOT during rollouts
-- For reward scaling: track discounted returns (u_t = r_t + γ(1-T_t)u_{t-1}), scale by their std, NO centering
-
-## Initialization
-- Key goal: Reduce interference and maintain proper scaling
-- Elsayed used sparse init (90% zeros, 1/√fan_in scaling) but orthogonal or other approaches may work
-- Don't assume sparse is necessary - validate empirically
-
-## Architecture
-- Use LayerNorm WITHOUT learnable parameters before each activation
-- Apply to pre-activations: φ(a) = (a - μ) / √(σ² + ε)
-
-## Implementation Approach
-- Start with BATCH versions, not streaming (simpler, still captures key ideas)
-- Begin with naked REINFORCE, then add simple baselines incrementally
-- The paper's insights apply to batch too: normalize obs, scale rewards by return std, layer norm, proper init
-
-These details make the difference between working and non-working implementations.
-
 # Important Reminders
 
 - Quality > Quantity
@@ -178,11 +145,10 @@ These details make the difference between working and non-working implementation
 
 ## Modules Available
 - `src/normalize`: Observation normalization and reward scaling
-- `src/init`: Sparse initialization  
+- `src/init`: Sparse initialization
 - `src/reinforce`: REINFORCE loss (takes policy function as argument)
 - `src/distributions`: Gaussian log probability calculation
-- `src/policy_nnx`: Flax NNX policy implementation
-- `src/hypersearch`: Optuna hyperparameter search utilities
+- `src/policy`: Flax NNX policy implementation
 
 ## Key Design Decisions
 - REINFORCE loss is decoupled from policy implementation - takes a JIT'd policy function
@@ -197,7 +163,7 @@ These details make the difference between working and non-working implementation
   class Model(nnx.Module):
       def __init__(self, rngs):
           self.w = nnx.Param(jax.random.normal(rngs.params(), shape))
-      
+
       def __call__(self, x):
           return x @ self.w.value
   ```
@@ -218,35 +184,10 @@ These details make the difference between working and non-working implementation
 - Test outputs should go to `tests/outputs/` (plots, CSVs)
 
 ## Optuna Ask-and-Tell Pattern for JAX vmap
-- Use `study.ask()` to get multiple trials at once
+- You can use `study.ask()` to get multiple trials at once
 - Vectorize evaluation with `jax.vmap` over hyperparameters
 - Use `study.tell()` to report results back
-- This is much more efficient than Optuna's default parallelization
 - Example in `tests/test_ask_tell_vmap.py`
-
-## Hyperparameter Search Findings
-- For simple supervised learning: lr ~0.02, sparsity ~0.8-0.85 work well
-- Text output > plots for LLM analysis (save tokens)
-- Examine CSVs directly with grep/sort for quick insights
-- LayerNorm without learnable params can hurt on simple tasks
-- JIT compilation crucial: use @nnx.jit on train_step
-
-## LayerNorm + Sparse Init Interaction
-- LayerNorm amplifies small activations to unit variance
-- With sparse init (scale ~0.1), LayerNorm causes 10-100x amplification
-- This leads to:
-  - Much larger initial loss (10-25x)
-  - Much larger gradients (10-25x)
-  - Potential training instability
-- The issue is worst at intermediate sparsity (0.5-0.8)
-- At very high sparsity (0.95), the effect is reduced
-- This explains why LayerNorm appeared to hurt in simple tests
-
-## Known Issues to Address
-- Magic numbers need to be extracted as constants
-- Test setup code needs factoring to reduce duplication
-- Research files in root directory should be moved
-- Inline tests in implementation files need moving to test.py
 
 # Meta Methodological Points
 
@@ -257,27 +198,23 @@ These details make the difference between working and non-working implementation
 - Start with POC, extract utilities only after proven useful
 - Smaller commits > large commits (split by concern)
 
-## Testing Approach  
+## Testing Approach
+- Examine CSVs directly with grep/sort for quick insights
+- JIT compilation crucial: use @nnx.jit on train_step
 - Test IMMEDIATELY after writing even 10 lines
-- If tests take >20s, add @pytest.mark.slow
+- If tests take >1-5s, add @pytest.mark.slow
 - Maintain fast feedback loop with `just check`
 - Text output > plots for LLM analysis (save tokens)
 
 ## Common Mistakes to Avoid
-- Writing utilities before they're needed
-- Keeping broken/overcomplicated code
+- Writing utilities before they're needed - write straightforward POC first, get it to work, then refactor
+- Keeping overcomplicated/brittle code
 - Large monolithic commits
 - Not running tests frequently enough
-- Generating plots when CSV/text would suffice
+- Generating only plots for agentic debugging, when CSV/text would suffice
 
 ## When User Gives Feedback
-- Document it immediately in CLAUDE.md
+- Document it in CLAUDE.md
 - Look for patterns in repeated feedback
 - Adjust approach before continuing
 - Ask for clarification if unsure
-
-# important-instruction-reminders
-Do what has been asked; nothing more, nothing less.
-NEVER create files unless they're absolutely necessary for achieving your goal.
-ALWAYS prefer editing an existing file to creating a new one.
-NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

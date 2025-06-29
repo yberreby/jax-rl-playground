@@ -3,7 +3,7 @@ import optax
 from flax import nnx
 from tests.fixtures import create_test_policy, create_test_data
 from tests.constants import DEFAULT_LEARNING_RATE
-from tests.common_patterns import create_loss_fn
+from tests.utils import create_loss_fn
 
 
 def test_gradients_exist():
@@ -14,16 +14,8 @@ def test_gradients_exist():
 
     _, grads = nnx.value_and_grad(loss_fn)(policy)
 
-    # Print grad structure to understand it
-    print(f"Gradient type: {type(grads)}")
-    print(f"Gradient attributes: {dir(grads)}")
-
     # Try to access gradients
-    if hasattr(grads, "w1"):
-        assert jnp.any(grads.w1 != 0)
-    else:
-        # Maybe it's a different structure
-        print(f"Grads content: {grads}")
+    assert jnp.any(grads.w1 != 0)
 
 
 def test_parameters_update():

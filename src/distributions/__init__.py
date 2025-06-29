@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-
+# TODO: use standard APIs
 @jax.jit
 def gaussian_log_prob(
     x: Float[Array, "... dim"],

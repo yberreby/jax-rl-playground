@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from src.policy_nnx import sample_actions
+from src.policy import sample_actions
 from tests.fixtures import create_test_policy
 from tests.constants import DEFAULT_OBS_DIM, DEFAULT_ACTION_DIM, DEFAULT_SEED
 

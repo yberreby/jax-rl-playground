@@ -2,7 +2,7 @@ import jax
 from flax import nnx
 from typing import Dict, List, Tuple
 from tests.constants import DEFAULT_N_STEPS, LOG_INTERVAL
-from tests.common_patterns import create_loss_fn, extract_gradient_norms
+from tests.utils import create_loss_fn, extract_gradient_norms
 
 
 @nnx.jit

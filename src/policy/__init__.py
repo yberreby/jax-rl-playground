@@ -19,10 +19,9 @@ class GaussianPolicy(nnx.Module):
         if rngs is None:
             rngs = nnx.Rngs(0)
 
-        # Use sparse initialization
         key1, key2 = jax.random.split(rngs())
 
-        # Initialize weights with sparse init
+        # Initialize weights with sparse init (for now)
         self.w1 = nnx.Param(
             sparse_init(key1, (obs_dim, hidden_dim), sparsity=DEFAULT_SPARSITY)
         )
@@ -32,10 +31,9 @@ class GaussianPolicy(nnx.Module):
         )
         self.b2 = nnx.Param(jnp.zeros(action_dim))
 
-        # Store use_layernorm flag
         self.use_layernorm = use_layernorm
 
-        # LayerNorm WITHOUT learnable parameters (as per paper)
+        # LayerNorm WITHOUT learnable parameters
         if use_layernorm:
             self.layer_norm = nnx.LayerNorm(
                 num_features=hidden_dim, use_bias=False, use_scale=False, rngs=rngs
@@ -49,9 +47,9 @@ class GaussianPolicy(nnx.Module):
     ) -> tuple[Float[Array, "batch act_dim"], Float[Array, "batch act_dim"]]:
         h = obs @ self.w1.value + self.b1.value
 
-        # Apply LayerNorm only if enabled
         if self.use_layernorm:
-            h = self.layer_norm(h)  # LayerNorm on pre-activations (no learnable params)
+            # LayerNorm on pre-activations
+            h = self.layer_norm(h)
 
         h = jax.nn.relu(h)
 
@@ -72,7 +70,6 @@ def sample_actions(
     eps = jax.random.normal(key, mean.shape)
     actions = mean + std * eps
 
-    # Compute log probs
     log_probs = gaussian_log_prob(actions, mean, std)
 
     return actions, log_probs

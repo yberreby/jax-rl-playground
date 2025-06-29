@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from flax import nnx
 import optax
-from src.policy_nnx import GaussianPolicy
+from src.policy import GaussianPolicy
 from tests.constants import (
     DEFAULT_SEED,
     DEFAULT_OBS_DIM,
@@ -83,7 +83,7 @@ def create_optimizer(
 
 
 def create_non_learnable_layernorm(num_features: int, rngs: nnx.Rngs) -> nnx.LayerNorm:
-    """Create LayerNorm without learnable parameters (as per Elsayed et al.)"""
+    """Create LayerNorm without learnable parameters"""
     return nnx.LayerNorm(
         num_features=num_features, use_bias=False, use_scale=False, rngs=rngs
     )
