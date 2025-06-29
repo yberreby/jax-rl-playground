@@ -7,7 +7,8 @@ license-files = ["LICEN[CS]E*"]
 requires-python = ">=3.12"
 dependencies = [
     # Our bread and butter.
-    "jax[cuda12]>=0.6.2",
+    "jax>=0.6.2",
+    # "jax[cuda12]>=0.6.2",
     # "jax[cpu]>=0.6.2",
     # Neural network library for JAX.
     "flax>=0.10.0",
