@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+        cache-dependency-glob: |
+          **/pyproject.toml
+          **/uv.lock
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+    
+    - name: Install dependencies with CPU-only JAX
+      run: |
+        # Install all dependencies including the project
+        uv sync --all-extras --dev
+        # Override with CPU-only JAX
+        uv pip install --force-reinstall "jax[cpu]"
+    
+    - name: Create test outputs directory
+      run: mkdir -p tests/outputs
+    
+    - name: Run checks
+      run: |
+        uv run just check
+      env:
+        XLA_PYTHON_CLIENT_PREALLOCATE: false
+    
+    - name: Run slow tests
+      run: |
+        uv run just slowcheck
+      env:
+        XLA_PYTHON_CLIENT_PREALLOCATE: false
