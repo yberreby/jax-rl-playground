@@ -1,5 +1,6 @@
 # Runtime shape checking.
 from jaxtyping import install_import_hook
+
 hook = install_import_hook("src", "beartype.beartype")
 
 from .normalize import normalize_obs, scale_rewards  # noqa: E402
