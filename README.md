@@ -33,6 +33,27 @@ uv sync
 uv run just
 ```
 
+## 🍴 Fork & Customize
+
+```bash
+git clone https://github.com/yberreby/jax-rl-playground my-project-name
+cd my-project-name
+./customize.py --name "My RL Project" --author "Your Name"
+
+# Review changes
+git diff
+
+# Set your remote repository
+git remote set-url origin git@github.com:yourusername/my-project-name.git
+
+# Commit only relevant files
+git add -u  # stages modified files only
+git commit -m "Customize template"
+git push -u origin master
+```
+
+The customization script updates project name, author, and adds MIT attribution.
+
 ## 💡 Key Benefits
 
 - **No setup required** - CI/CD, testing, linting all pre-configured
@@ -49,4 +70,4 @@ Based on [@yberreby/jax-ml-template](https://github.com/yberreby/jax-ml-template
 
 ## License
 
-MIT License. See `./LICENSE.md` for details.
+MIT License. See `./LICENSE` for details.

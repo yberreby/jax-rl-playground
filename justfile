@@ -21,7 +21,7 @@ test pattern: fastcheck
 # Linting and type checking
 fastcheck: setup
     uv run ruff check --fix
-    uvx ty check
+    uvx ty check src tests
 
 # Create venv and install all dependencies from uv.lock
 setup:
