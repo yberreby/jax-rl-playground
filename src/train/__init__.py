@@ -4,6 +4,7 @@ from jaxtyping import Array, Float
 from typing import NamedTuple
 from flax import nnx
 import optax
+import equinox as eqx
 from ..baseline import BaselineState, update_baseline, compute_advantages
 from ..distributions import gaussian_log_prob
 
@@ -31,52 +32,97 @@ def compute_returns(
     return returns
 
 
+@eqx.filter_jit
 def collect_episode(
-    policy,  # nnx.Module but type system doesn't understand callable
+    policy,  # nnx.Module
     env_step,  # Environment step function
     env_reset,  # Environment reset function  
     key: Array,
     max_steps: int = 200,
 ) -> EpisodeResult:
-    key, reset_key, episode_key = jax.random.split(key, 3)
-    env_state = env_reset(reset_key)
-
-    states = []
-    actions = []
-    rewards = []
-
-    for _ in range(max_steps):
-        episode_key, action_key = jax.random.split(episode_key)
-
+    """Collect a single episode using JAX scan (JIT-compiled)."""
+    key, reset_key = jax.random.split(key)
+    initial_env_state = env_reset(reset_key)
+    
+    def step_fn(carry, key):
+        env_state, done = carry
+        
         # Sample action from policy
         obs_batch = env_state.state[None, :]
         mean, std = policy(obs_batch)
-        eps = jax.random.normal(action_key, mean.shape)
-        action = (mean + std * eps)[0]  # Sample and remove batch dim
-
+        eps = jax.random.normal(key, mean.shape)
+        action = (mean + std * eps)[0]
+        
         # Step environment
         result = env_step(env_state, action)
-
-        states.append(env_state.state)
-        actions.append(action)
-        rewards.append(result.reward)
-
-        env_state = result.env_state
-
-        if result.done == 1.0:
-            break
-
-    states = jnp.stack(states)
-    actions = jnp.stack(actions)
-    rewards = jnp.stack(rewards)
+        
+        # Mask updates if already done
+        new_env_state = jax.tree_util.tree_map(
+            lambda new, old: jnp.where(done, old, new),
+            result.env_state, env_state
+        )
+        new_done = jnp.maximum(done, result.done)
+        
+        # Output for this step (current state, not next)
+        output = (env_state.state, action, result.reward * (1.0 - done))
+        
+        return (new_env_state, new_done), output
+    
+    # Generate keys for all steps
+    keys = jax.random.split(key, max_steps)
+    
+    # Run scan
+    (final_env_state, final_done), (states, actions, rewards) = jax.lax.scan(
+        step_fn, (initial_env_state, jnp.array(0.0)), keys
+    )
+    
+    # Compute returns
     returns = compute_returns(rewards)
-
+    
     return EpisodeResult(
         states=states,
         actions=actions,
         rewards=rewards,
         returns=returns,
         total_reward=jnp.sum(rewards),
+    )
+
+
+@eqx.filter_jit
+def collect_episodes(
+    policy,  # nnx.Module
+    env_step,  # Environment step function
+    env_reset,  # Environment reset function
+    key: Array,
+    n_episodes: int,
+    max_steps: int = 200,
+) -> EpisodeResult:
+    """Collect multiple episodes in parallel using vmap."""
+    keys = jax.random.split(key, n_episodes)
+    
+    # vmap over episodes
+    vmapped_collect = jax.vmap(
+        lambda k: collect_episode(policy, env_step, env_reset, k, max_steps),
+        in_axes=0
+    )
+    
+    results = vmapped_collect(keys)
+    
+    # Flatten batch dimension for training
+    states = results.states.reshape(-1, 2)
+    actions = results.actions.reshape(-1, 1)
+    rewards = results.rewards.reshape(-1)
+    returns = results.returns.reshape(-1)
+    
+    # Keep per-episode totals
+    total_rewards = jax.vmap(jnp.sum)(results.rewards)
+    
+    return EpisodeResult(
+        states=states,
+        actions=actions,
+        rewards=rewards,
+        returns=returns,
+        total_reward=jnp.mean(total_rewards),  # Mean across episodes
     )
 
 
