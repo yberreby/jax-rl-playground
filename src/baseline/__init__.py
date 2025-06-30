@@ -7,7 +7,7 @@ from typing import NamedTuple
 class BaselineState(NamedTuple):
     """Running mean baseline for variance reduction."""
     mean: Float[Array, ""]
-    count: int
+    n_samples: int
 
 
 @jax.jit
@@ -19,10 +19,10 @@ def update_baseline(
     batch_mean = jnp.mean(values)
     
     # Running average
-    total_count = state.count + batch_size
-    new_mean = (state.mean * state.count + batch_mean * batch_size) / total_count
+    total_count = state.n_samples + batch_size
+    new_mean = (state.mean * state.n_samples + batch_mean * batch_size) / total_count
     
-    return BaselineState(mean=new_mean, count=total_count)
+    return BaselineState(mean=new_mean, n_samples=total_count)
 
 
 @jax.jit
@@ -35,4 +35,4 @@ def compute_advantages(
 
 def init_baseline() -> BaselineState:
     """Initialize baseline with zero mean."""
-    return BaselineState(mean=jnp.array(0.0), count=0)
+    return BaselineState(mean=jnp.array(0.0), n_samples=0)

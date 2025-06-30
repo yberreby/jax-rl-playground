@@ -6,12 +6,9 @@ import jax
 import jax.numpy as jnp
 from src.policy import GaussianPolicy
 from src.pendulum import step, reset_env
-from src.train import (
-    collect_episodes, train_step, compute_critic_advantages,
-    update_running_stats, normalize_advantages
-)
-from src.critic import ValueFunction, update_critic
-from src.advantage_normalizer import init_running_stats
+from src.train import collect_episodes, train_step
+from src.critic import ValueFunction, update_critic, compute_critic_advantages
+from src.advantage_normalizer import normalize_advantages
 from flax import nnx
 import optax
 
@@ -31,7 +28,6 @@ def benchmark_training_components():
     critic_optimizer = nnx.Optimizer(critic, optax.adam(2e-4))
     
     key = jax.random.PRNGKey(42)
-    adv_stats = init_running_stats()
     
     # Warmup JIT compilation
     print("\nWarming up JIT compilation...")
@@ -80,10 +76,9 @@ def benchmark_training_components():
             jax.block_until_ready(advantages)
             iter_times['compute_advantages'] = time.time() - start
             
-            # 4. Update statistics
+            # 4. Normalize advantages
             start = time.time()
-            adv_stats = update_running_stats(adv_stats, advantages)
-            normalized_advantages = normalize_advantages(advantages, adv_stats)
+            normalized_advantages = normalize_advantages(advantages)
             jax.block_until_ready(normalized_advantages)
             iter_times['normalize'] = time.time() - start
             
@@ -173,7 +168,6 @@ def benchmark_minimal_loop():
     critic_optimizer = nnx.Optimizer(critic, optax.adam(2e-4))
     
     key = jax.random.PRNGKey(42)
-    adv_stats = init_running_stats()
     
     # Warmup
     key, subkey = jax.random.split(key)
@@ -192,8 +186,7 @@ def benchmark_minimal_loop():
         advantages = compute_critic_advantages(critic, episode_batch.states, episode_batch.returns)
         
         # Normalize and update policy
-        adv_stats = update_running_stats(adv_stats, advantages)
-        normalized_advantages = normalize_advantages(advantages, adv_stats)
+        normalized_advantages = normalize_advantages(advantages)
         loss, _, _ = train_step(policy, optimizer, episode_batch.states, episode_batch.actions, normalized_advantages)
         
         # Force completion

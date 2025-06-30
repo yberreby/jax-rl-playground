@@ -7,12 +7,7 @@ import optax
 import equinox as eqx
 from ..policy import sample_actions
 from ..baseline import BaselineState, update_baseline, compute_advantages
-from ..advantage_normalizer import (
-    RunningStats,
-    update_running_stats,
-    normalize_advantages,
-    init_running_stats,
-)
+from ..advantage_normalizer import normalize_advantages
 from ..critic import ValueFunction, update_critic, compute_critic_advantages
 
 
@@ -20,7 +15,6 @@ class TrainState(NamedTuple):
     step: int
     key: Array
     baseline: BaselineState
-    advantage_stats: RunningStats
 
 
 class EpisodeResult(NamedTuple):
@@ -188,7 +182,6 @@ def train(
     use_critic: bool = False,
     seed: int = 0,
     verbose: bool = True,
-    burn_in_iterations: int = 5,
 ) -> dict:
     # Initialize
     key = jax.random.PRNGKey(seed)
@@ -212,8 +205,7 @@ def train(
     train_state = TrainState(
         step=0,
         key=key,
-        baseline=BaselineState(mean=jnp.array(0.0), count=0),
-        advantage_stats=init_running_stats(),
+        baseline=BaselineState(mean=jnp.array(0.0), n_samples=0),
     )
 
     # Tracking
@@ -240,43 +232,6 @@ def train(
         "returns_mean": [],
         "returns_std": [],
     }
-
-    # Burn-in phase: collect data to initialize advantage statistics
-    if verbose and burn_in_iterations > 0:
-        print(f"=== Burn-in phase: {burn_in_iterations} iterations ===")
-
-    for burn_i in range(burn_in_iterations):
-        # Collect episodes
-        key, collect_key = jax.random.split(train_state.key)
-        train_state = train_state._replace(key=key)
-
-        episode_batch = collect_episodes(
-            policy, env_step, env_reset, collect_key, episodes_per_iter
-        )
-
-        all_returns = episode_batch.returns
-
-        # Compute advantages
-        if use_baseline:
-            advantages = compute_advantages(all_returns, train_state.baseline.mean)
-            new_baseline = update_baseline(train_state.baseline, all_returns)
-            train_state = train_state._replace(baseline=new_baseline)
-        else:
-            advantages = all_returns
-
-        # Update running statistics only (no learning)
-        new_adv_stats = update_running_stats(train_state.advantage_stats, advantages)
-        train_state = train_state._replace(advantage_stats=new_adv_stats)
-
-        if verbose:
-            print(
-                f"Burn-in {burn_i}: mean={float(new_adv_stats.mean):.2f}, "
-                f"std={float(jnp.sqrt(new_adv_stats.var)):.2f}, "
-                f"count={float(new_adv_stats.count)}"
-            )
-
-    if verbose and burn_in_iterations > 0:
-        print(f"\n=== Training phase: {n_iterations} iterations ===")
 
     for i in range(n_iterations):
         # Collect episodes in parallel
@@ -309,12 +264,8 @@ def train(
         # Store raw advantage std before normalization
         raw_adv_std = jnp.std(advantages)
 
-        # Update running statistics
-        new_adv_stats = update_running_stats(train_state.advantage_stats, advantages)
-        train_state = train_state._replace(advantage_stats=new_adv_stats)
-
-        # Normalize advantages using stable statistics (no centering!)
-        advantages = normalize_advantages(advantages, new_adv_stats)
+        # Normalize advantages
+        advantages = normalize_advantages(advantages)
 
         # Update policy
         loss, grad_norm, grad_var = train_step(

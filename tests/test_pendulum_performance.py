@@ -137,8 +137,7 @@ def test_minimal_training_metrics():
         episodes_per_iter=256,
         learning_rate=5e-4,
         use_critic=False,
-        verbose=False,
-        burn_in_iterations=2
+        verbose=False
     )
     elapsed = time.perf_counter() - start
     

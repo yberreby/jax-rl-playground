@@ -5,7 +5,7 @@ from . import update_baseline, compute_advantages, init_baseline
 def test_init_baseline():
     state = init_baseline()
     assert state.mean == 0.0
-    assert state.count == 0
+    assert state.n_samples == 0
 
 
 def test_update_baseline_single_batch():
@@ -15,7 +15,7 @@ def test_update_baseline_single_batch():
     new_state = update_baseline(state, returns)
 
     assert jnp.allclose(new_state.mean, 2.0)  # mean of [1, 2, 3]
-    assert new_state.count == 3
+    assert new_state.n_samples == 3
 
 
 def test_update_baseline_incremental():
@@ -26,7 +26,7 @@ def test_update_baseline_incremental():
     returns1 = jnp.array([1.0, 2.0])
     state = update_baseline(state, returns1)
     assert jnp.allclose(state.mean, 1.5)
-    assert state.count == 2
+    assert state.n_samples == 2
 
     # Second batch
     returns2 = jnp.array([3.0, 4.0, 5.0])
@@ -34,7 +34,7 @@ def test_update_baseline_incremental():
 
     # Overall mean should be (1+2+3+4+5)/5 = 3.0
     assert jnp.allclose(state.mean, 3.0)
-    assert state.count == 5
+    assert state.n_samples == 5
 
 
 def test_compute_advantages():
