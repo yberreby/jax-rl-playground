@@ -5,30 +5,34 @@ from typing import NamedTuple
 
 
 class BaselineState(NamedTuple):
+    """Running mean baseline for variance reduction."""
     mean: Float[Array, ""]
-    n_samples: int  # Renamed from count to avoid conflict
+    count: int
 
 
 @jax.jit
 def update_baseline(
-    state: BaselineState, returns: Float[Array, "batch"]
+    state: BaselineState, values: Float[Array, "batch"]
 ) -> BaselineState:
-    batch_mean = jnp.mean(returns)
-    batch_size = returns.shape[0]
-
-    # Incremental mean update
-    total_count = state.n_samples + batch_size
-    new_mean = (state.mean * state.n_samples + batch_mean * batch_size) / total_count
-
-    return BaselineState(mean=new_mean, n_samples=total_count)
+    """Update running mean with new values."""
+    batch_size = values.shape[0]
+    batch_mean = jnp.mean(values)
+    
+    # Running average
+    total_count = state.count + batch_size
+    new_mean = (state.mean * state.count + batch_mean * batch_size) / total_count
+    
+    return BaselineState(mean=new_mean, count=total_count)
 
 
 @jax.jit
 def compute_advantages(
     returns: Float[Array, "batch"], baseline: Float[Array, ""]
 ) -> Float[Array, "batch"]:
+    """Compute advantages as returns - baseline."""
     return returns - baseline
 
 
 def init_baseline() -> BaselineState:
-    return BaselineState(mean=jnp.array(0.0), n_samples=0)
+    """Initialize baseline with zero mean."""
+    return BaselineState(mean=jnp.array(0.0), count=0)

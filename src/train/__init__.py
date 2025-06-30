@@ -212,7 +212,7 @@ def train(
     train_state = TrainState(
         step=0,
         key=key,
-        baseline=BaselineState(mean=jnp.array(0.0), n_samples=0),
+        baseline=BaselineState(mean=jnp.array(0.0), count=0),
         advantage_stats=init_running_stats(),
     )
 
