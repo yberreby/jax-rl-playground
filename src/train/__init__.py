@@ -9,6 +9,8 @@ from ..advantage_normalizer import normalize_advantages
 from ..critic import ValueFunction, update_critic, compute_critic_advantages
 from .episodes import collect_episodes
 from .metrics import MetricsTracker
+from .lr_schedule import create_lr_schedule
+from ..pendulum.features import compute_features
 
 
 class TrainState(NamedTuple):
@@ -24,13 +26,20 @@ def train_step(
     batch_states: Float[Array, "batch obs_dim"],
     batch_actions: Float[Array, "batch act_dim"],
     batch_advantages: Float[Array, "batch"],
+    entropy_coef: float = 0.01,
 ) -> tuple[Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
     def loss_fn(policy):
         # Use policy's log_prob method
         log_probs = policy.log_prob(batch_states, batch_actions)
+        
+        # Get policy distribution for entropy
+        mean, std = policy(batch_states)
+        # Entropy of Gaussian: 0.5 * log(2 * pi * e * sigma^2)
+        entropy = jnp.mean(0.5 * jnp.log(2 * jnp.pi * jnp.e * std**2))
 
-        # REINFORCE loss
-        return -jnp.mean(log_probs * batch_advantages)
+        # REINFORCE loss with entropy bonus
+        pg_loss = -jnp.mean(log_probs * batch_advantages)
+        return pg_loss - entropy_coef * entropy
 
     loss, grads = nnx.value_and_grad(loss_fn)(policy)
 
@@ -61,18 +70,30 @@ def train(
     n_iterations: int = 100,
     episodes_per_iter: int = 10,
     learning_rate: float = 1e-3,
+    warmup_steps: int = 100,
     use_baseline: bool = True,
     use_critic: bool = False,
     seed: int = 0,
     verbose: bool = True,
+    adam_b1: float = 0.9,
+    adam_b2: float = 0.999,
 ) -> dict:
     # Initialize
     key = jax.random.PRNGKey(seed)
+    
+    # Create learning rate schedule
+    lr_schedule = create_lr_schedule(
+        base_lr=learning_rate,
+        warmup_steps=warmup_steps,
+        decay_steps=n_iterations,
+        end_lr_factor=0.1,
+    )
+    
     optimizer = nnx.Optimizer(
         policy,
         optax.chain(
             optax.clip_by_global_norm(1.0),  # Clip gradients to prevent explosion
-            optax.adam(learning_rate),
+            optax.adam(lr_schedule, b1=adam_b1, b2=adam_b2),
         ),
     )
 
@@ -105,7 +126,8 @@ def train(
         )
 
         # Data is already aggregated
-        all_states = episode_batch.states
+        all_states = episode_batch.states  # Raw states (for critic if needed)
+        all_features = episode_batch.features  # Features for policy
         all_actions = episode_batch.actions
         all_returns = episode_batch.returns
 
@@ -131,12 +153,21 @@ def train(
 
         # Update policy
         loss, grad_norm, grad_var = train_step(
-            policy, optimizer, all_states, all_actions, normalized_advantages
+            policy, optimizer, all_features, all_actions, normalized_advantages
         )
 
         # Test policy at origin for tracking
         test_states = jnp.zeros((1, 2))  # Test at origin (pendulum-specific)
-        test_mean, test_std = policy(test_states)
+        test_features = compute_features(test_states[0])[None, :]  # Add batch dim
+        test_mean, test_std = policy(test_features)
+        
+        # Compute policy entropy (average over batch)
+        _, policy_stds = policy(all_features)
+        # Entropy of Gaussian: 0.5 * log(2 * pi * e * sigma^2)
+        entropy = jnp.mean(0.5 * jnp.log(2 * jnp.pi * jnp.e * policy_stds**2))
+        
+        # Get current learning rate
+        current_lr = float(lr_schedule(i))
         
         # Update metrics
         metrics_tracker.update(
@@ -151,6 +182,8 @@ def train(
             policy_test_mean=test_mean,
             policy_test_std=test_std,
             episodes_per_iter=episodes_per_iter,
+            learning_rate=current_lr,
+            entropy=entropy,
         )
         
         # Log progress

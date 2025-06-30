@@ -31,6 +31,9 @@ class MetricsTracker:
             "policy_std_mean": [],
             "returns_mean": [],
             "returns_std": [],
+            "learning_rate": [],
+            "entropy": [],  # Policy entropy
+            "kl_divergence": [],  # KL from initial policy
         }
     
     def update(
@@ -46,6 +49,8 @@ class MetricsTracker:
         policy_test_mean: Float[Array, "1 act_dim"],
         policy_test_std: Float[Array, "1 act_dim"],
         episodes_per_iter: int,
+        learning_rate: float = None,
+        entropy: Float[Array, ""] = None,
     ) -> None:
         """Update metrics with new values."""
         # Compute episode length
@@ -74,6 +79,9 @@ class MetricsTracker:
             "policy_std_mean": float(jnp.mean(policy_test_std)),
             "returns_mean": float(jnp.mean(episode_batch.returns)),
             "returns_std": float(jnp.std(episode_batch.returns)),
+            "learning_rate": float(learning_rate) if learning_rate is not None else 0.0,
+            "entropy": float(entropy) if entropy is not None else 0.0,
+            "kl_divergence": 0.0,  # TODO: implement KL tracking
         }
         
         # Update all metrics
@@ -84,12 +92,22 @@ class MetricsTracker:
         """Log current iteration metrics."""
         if verbose and iteration % 10 == 0:
             print(
-                f"Iter {iteration:3d} | "
+                f"Iter {iteration:4d} | "
                 f"Return: {self.metrics['mean_return'][-1]:6.3f} | "
                 f"Loss: {self.metrics['loss'][-1]:10.2f} | "
-                f"GradNorm: {self.metrics['grad_norm'][-1]:8.2f} | "
-                f"RawAdvStd: {self.metrics['raw_advantage_std'][-1]:6.2f}"
+                f"GradNorm: {self.metrics['grad_norm'][-1]:6.2f} | "
+                f"Entropy: {self.metrics['entropy'][-1]:6.2f} | "
+                f"LR: {self.metrics['learning_rate'][-1]:.2e} | "
+                f"AdvStd: {self.metrics['raw_advantage_std'][-1]:6.1f}"
             )
+            
+            # Extra diagnostic every 50 iterations
+            if iteration % 50 == 0 and iteration > 0:
+                print(
+                    f"  └─ Actions: [{self.metrics['min_action'][-1]:5.2f}, {self.metrics['max_action'][-1]:5.2f}] "
+                    f"(μ={self.metrics['mean_action'][-1]:5.2f}, σ={self.metrics['std_action'][-1]:5.2f}) | "
+                    f"Policy σ: {self.metrics['policy_std_mean'][-1]:5.3f}"
+                )
     
     def to_dict(self) -> Dict[str, List[float]]:
         """Return metrics as dictionary."""
