@@ -14,7 +14,7 @@ from src.viz.pendulum import PendulumVisualizer
 from src.pendulum.features import compute_features
 
 
-def generate_video(policy, output_path: str, n_episodes: int = 2):
+def generate_video(policy, output_path: str, n_episodes: int = 1):
     """Generate video of policy execution."""
     import jax
     
@@ -86,7 +86,7 @@ def main():
     parser.add_argument("--b2", type=float, default=0.999, help="Adam beta2 parameter")
     parser.add_argument("--warmup", type=int, default=100, help="Warmup steps for learning rate")
     parser.add_argument("--no-video", action="store_true", help="Skip video generation")
-    parser.add_argument("--verbose", action="store_true", help="Print training progress")
+    parser.add_argument("--quiet", action="store_true", help="Suppress training progress output")
     args = parser.parse_args()
     
     # Create output directory
@@ -95,7 +95,7 @@ def main():
     else:
         exp_name = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    output_dir = Path("tests/outputs") / f"pendulum_{exp_name}"
+    output_dir = Path("tests/outputs/pendulum") / exp_name
     output_dir.mkdir(parents=True, exist_ok=True)
     
     print(f"Training pendulum swing-up experiment: {exp_name}")
@@ -131,7 +131,7 @@ def main():
         use_baseline=True,
         use_critic=args.use_critic,
         seed=args.seed,
-        verbose=args.verbose,
+        verbose=not args.quiet,
         adam_b1=args.b1,
         adam_b2=args.b2,
     )
@@ -150,7 +150,7 @@ def main():
     if not args.no_video:
         print("\nGenerating video...")
         video_path = output_dir / "policy.mp4"
-        if generate_video(policy, str(video_path), n_episodes=2):
+        if generate_video(policy, str(video_path), n_episodes=1):
             print(f"Saved video to {video_path}")
     
     # Print summary

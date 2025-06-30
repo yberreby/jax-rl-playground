@@ -78,7 +78,7 @@ class GaussianPolicy(nnx.Module):
         # Inverse tanh to get unbounded actions
         # Clip to avoid numerical issues at boundaries
         actions_clipped = jnp.clip(actions, -MAX_TORQUE + 1e-6, MAX_TORQUE - 1e-6)
-        unbounded_actions = MAX_TORQUE * jnp.arctanh(actions_clipped / MAX_TORQUE)
+        unbounded_actions = jnp.arctanh(actions_clipped / MAX_TORQUE)
 
         # Log prob in unbounded space
         log_probs = gaussian_log_prob(unbounded_actions, mean, std)
@@ -110,7 +110,7 @@ def sample_actions(
     unbounded_actions = mean + std * eps
 
     # Apply tanh squashing to bound actions
-    actions = MAX_TORQUE * jnp.tanh(unbounded_actions / MAX_TORQUE)
+    actions = MAX_TORQUE * jnp.tanh(unbounded_actions)
 
     # Use policy's log_prob method for consistency
     log_probs = policy.log_prob(obs, actions)

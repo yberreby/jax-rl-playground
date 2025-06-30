@@ -33,6 +33,9 @@ class MetricsTracker:
             "learning_rate": [],
             "entropy": [],  # Policy entropy
             "kl_divergence": [],  # KL from initial policy
+            "action_saturation": [],  # Fraction of actions near bounds
+            "baseline_error": [],  # |advantages - 0| before normalization
+            "explained_variance": [],  # How well baseline predicts returns
         }
     
     def update(
@@ -50,6 +53,9 @@ class MetricsTracker:
         episodes_per_iter: int,
         learning_rate: float,
         entropy: Float[Array, ""],
+        action_saturation: Float[Array, ""],
+        explained_variance: Float[Array, ""],
+        advantages: Float[Array, "batch"],
     ) -> None:
         """Update metrics with new values."""
         # Compute episode length
@@ -81,6 +87,9 @@ class MetricsTracker:
             "learning_rate": float(learning_rate) if learning_rate is not None else 0.0,
             "entropy": float(entropy) if entropy is not None else 0.0,
             "kl_divergence": 0.0,  # TODO: implement KL tracking
+            "action_saturation": float(action_saturation),
+            "baseline_error": float(jnp.mean(jnp.abs(advantages))),
+            "explained_variance": float(explained_variance),
         }
         
         # Update all metrics
@@ -89,24 +98,44 @@ class MetricsTracker:
     
     def log_iteration(self, iteration: int, verbose: bool = True) -> None:
         """Log current iteration metrics."""
-        if verbose and iteration % 10 == 0:
+        if not verbose:
+            return
+            
+        # Log every 5 iterations for better visibility
+        if iteration % 5 == 0:
+            # Key=value format for easy parsing
+            metrics_str = (
+                f"iter={iteration:04d} "
+                f"return={self.metrics['mean_return'][-1]:+.3f} "
+                f"loss={self.metrics['loss'][-1]:.2f} "
+                f"grad_norm={self.metrics['grad_norm'][-1]:.2f} "
+                f"entropy={self.metrics['entropy'][-1]:.3f} "
+                f"lr={self.metrics['learning_rate'][-1]:.1e} "
+                f"adv_std={self.metrics['raw_advantage_std'][-1]:.1f} "
+                f"saturation={self.metrics['action_saturation'][-1]:.2%} "
+                f"expl_var={self.metrics['explained_variance'][-1]:+.2f}"
+            )
+            print(metrics_str)
+            
+        # Detailed diagnostics every 25 iterations
+        if iteration % 25 == 0 and iteration > 0:
             print(
-                f"Iter {iteration:4d} | "
-                f"Return: {self.metrics['mean_return'][-1]:6.3f} | "
-                f"Loss: {self.metrics['loss'][-1]:10.2f} | "
-                f"GradNorm: {self.metrics['grad_norm'][-1]:6.2f} | "
-                f"Entropy: {self.metrics['entropy'][-1]:6.2f} | "
-                f"LR: {self.metrics['learning_rate'][-1]:.2e} | "
-                f"AdvStd: {self.metrics['raw_advantage_std'][-1]:6.1f}"
+                f"  └─ actions: min={self.metrics['min_action'][-1]:.2f} "
+                f"max={self.metrics['max_action'][-1]:.2f} "
+                f"mean={self.metrics['mean_action'][-1]:.2f} "
+                f"std={self.metrics['std_action'][-1]:.2f} | "
+                f"policy_std={self.metrics['policy_std_mean'][-1]:.3f} | "
+                f"mean_log_prob={self.metrics['mean_log_prob'][-1]:.1f} "
+                f"baseline_err={self.metrics['baseline_error'][-1]:.2f}"
             )
             
-            # Extra diagnostic every 50 iterations
-            if iteration % 50 == 0 and iteration > 0:
-                print(
-                    f"  └─ Actions: [{self.metrics['min_action'][-1]:5.2f}, {self.metrics['max_action'][-1]:5.2f}] "
-                    f"(μ={self.metrics['mean_action'][-1]:5.2f}, σ={self.metrics['std_action'][-1]:5.2f}) | "
-                    f"Policy σ: {self.metrics['policy_std_mean'][-1]:5.3f}"
-                )
+        # Extra debug info every 10 iterations
+        if iteration % 10 == 0 and iteration > 0:
+            print(
+                f"  DEBUG: policy_mean_norm={self.metrics['policy_mean_norm'][-1]:.3f} "
+                f"returns_mean={self.metrics['returns_mean'][-1]:.3f} "
+                f"returns_std={self.metrics['returns_std'][-1]:.3f}"
+            )
     
     def to_dict(self) -> dict[str, list[float]]:
         """Return metrics as dictionary."""

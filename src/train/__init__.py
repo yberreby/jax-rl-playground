@@ -149,6 +149,14 @@ def train(
 
         # Store raw advantage std before normalization
         raw_adv_std = jnp.std(advantages)
+        
+        # Compute explained variance (how well baseline predicts returns)
+        if use_baseline:
+            ss_tot = jnp.sum((all_returns - jnp.mean(all_returns))**2)
+            ss_res = jnp.sum((all_returns - train_state.baseline.mean)**2)
+            explained_var = 1 - ss_res / (ss_tot + 1e-8)
+        else:
+            explained_var = jnp.array(0.0)
 
         # Normalize advantages
         normalized_advantages = normalize_advantages(advantages)
@@ -171,6 +179,12 @@ def train(
         # Get current learning rate
         current_lr = float(lr_schedule(i))
         
+        # Compute action saturation (fraction near boundaries)
+        from ..pendulum import MAX_TORQUE
+        action_magnitudes = jnp.abs(all_actions.flatten())
+        saturation_threshold = 0.95 * MAX_TORQUE
+        action_saturation = jnp.mean(action_magnitudes > saturation_threshold)
+        
         # Update metrics
         metrics_tracker.update(
             iteration=i,
@@ -186,6 +200,9 @@ def train(
             episodes_per_iter=episodes_per_iter,
             learning_rate=current_lr,
             entropy=entropy,
+            action_saturation=action_saturation,
+            explained_variance=explained_var,
+            advantages=advantages,
         )
         
         # Log progress

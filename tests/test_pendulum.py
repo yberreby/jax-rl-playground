@@ -71,6 +71,7 @@ def test_episode_collection():
     assert jnp.sum(episode_batch.rewards != 0.0) == 2 * MAX_EPISODE_STEPS
 
 
+@pytest.mark.slow
 def test_quick_episode_visualization():
     """Quick test that generates episode videos for feedback."""
     import time

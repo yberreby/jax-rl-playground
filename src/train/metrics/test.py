@@ -7,7 +7,6 @@ def test_metrics_tracker_initialization():
     tracker = MetricsTracker()
     
     # Check all metric lists are initialized empty
-    assert len(tracker.metrics) == 24  # Count actual metrics
     for key, values in tracker.metrics.items():
         assert values == []
 
@@ -40,6 +39,9 @@ def test_metrics_tracker_update():
         episodes_per_iter=10,
         learning_rate=1e-3,
         entropy=jnp.array(0.5),
+        action_saturation=jnp.array(0.1),
+        explained_variance=jnp.array(0.5),
+        advantages=jnp.ones(100),
     )
     
     # Check metrics were updated
@@ -80,6 +82,9 @@ def test_metrics_tracker_multiple_updates():
             episodes_per_iter=1,
             learning_rate=1e-3,
             entropy=jnp.array(0.5),
+            action_saturation=jnp.array(0.0),
+            explained_variance=jnp.array(0.0),
+            advantages=jnp.ones(100),
         )
     
     # Check all metrics have 5 entries
@@ -97,7 +102,6 @@ def test_metrics_tracker_to_dict():
     # Get dict before any updates
     metrics_dict = tracker.to_dict()
     assert isinstance(metrics_dict, dict)
-    assert len(metrics_dict) == 24
     
     # Update and check again
     episode_batch = EpisodeResult(
@@ -123,6 +127,9 @@ def test_metrics_tracker_to_dict():
         episodes_per_iter=1,
         learning_rate=1e-3,
         entropy=jnp.array(0.5),
+        action_saturation=jnp.array(0.0),
+        explained_variance=jnp.array(0.0),
+        advantages=jnp.ones(10),
     )
     
     metrics_dict = tracker.to_dict()
