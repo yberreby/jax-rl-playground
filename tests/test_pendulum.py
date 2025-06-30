@@ -75,7 +75,7 @@ def test_quick_episode_visualization():
     """Quick test that generates episode videos for feedback."""
     import time
     from pathlib import Path
-    from src.train import collect_episode
+    from src.train.episodes import collect_episode
     from src.viz.pendulum import PendulumVisualizer
     
     # Create output directory

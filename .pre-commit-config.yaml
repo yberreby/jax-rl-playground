@@ -7,3 +7,7 @@ repos:
         language: system
         types: [python]
         require_serial: true
+  - repo: https://github.com/gauge-sh/tach-pre-commit
+    rev: v0.30.0 # ensure recent tag
+    hooks:
+      - id: tach
