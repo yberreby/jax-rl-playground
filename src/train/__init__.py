@@ -55,10 +55,9 @@ def collect_episode(
     def step_fn(carry, key):
         env_state, done = carry
 
-        # Sample action from policy
-        action, log_prob = sample_actions(policy, env_state.state[None, :], key)
-        action = action[0]  # Remove batch dimension
-        log_prob = log_prob[0]  # Remove batch dimension
+        # Sample action from policy (without adding batch dimension)
+        # We'll handle the unbatched case in sample_actions
+        action, log_prob = sample_actions(policy, env_state.state, key)
 
         # Step environment
         result = env_step(env_state, action)
@@ -296,6 +295,7 @@ def train(
         # Compute advantages
         if use_critic:
             # Train critic to predict returns
+            assert critic is not None and critic_optimizer is not None
             update_critic(critic, critic_optimizer, all_states, all_returns)
             # Use critic as baseline
             advantages = compute_critic_advantages(critic, all_states, all_returns)
@@ -327,44 +327,59 @@ def train(
         # Compute episode length (for debugging)
         episode_length = jnp.sum(episode_batch.rewards != 0.0) / episodes_per_iter
 
-        # Track metrics
+        # Track metrics (batched device transfer for efficiency)
+        metric_array = jnp.array([
+            episode_batch.total_reward,
+            loss,
+            train_state.baseline.mean / 400.0,  # Divide by episode length
+            jnp.mean(advantages),
+            jnp.std(advantages),
+            jnp.mean(log_probs),
+            jnp.mean(episode_batch.actions),
+            jnp.std(episode_batch.actions),
+            grad_norm,
+            grad_var,
+            raw_adv_std,
+        ])
+        metric_values = [float(x) for x in metric_array]
+        
         metrics["iteration"].append(i)
-        metrics["mean_return"].append(
-            float(episode_batch.total_reward)
-        )  # This is average per step
+        metrics["mean_return"].append(metric_values[0])  # This is average per step
         metrics["std_return"].append(0.0)  # TODO: track individual episode returns
-        metrics["loss"].append(float(loss))
-        # Convert baseline to same scale as mean_return for display
-        metrics["baseline_value"].append(
-            float(train_state.baseline.mean / 400.0)
-        )  # Divide by episode length
-        # Note: advantages are now normalized, so std should be close to running estimate
-        metrics["mean_advantage"].append(float(jnp.mean(advantages)))
-        metrics["std_advantage"].append(float(jnp.std(advantages)))
-        metrics["mean_log_prob"].append(float(jnp.mean(log_probs)))
-        metrics["mean_action"].append(float(jnp.mean(episode_batch.actions)))
-        metrics["std_action"].append(float(jnp.std(episode_batch.actions)))
-        metrics["grad_norm"].append(float(grad_norm))
-        metrics["grad_variance"].append(float(grad_var))
-        metrics["raw_advantage_std"].append(float(raw_adv_std))
-        metrics["episode_length"].append(float(episode_length))
-
-        # Additional metrics
-        metrics["grad_norm_clipped"].append(
-            float(jnp.minimum(grad_norm, 1.0))
-        )  # After clipping
-        metrics["max_action"].append(float(jnp.max(episode_batch.actions)))
-        metrics["min_action"].append(float(jnp.min(episode_batch.actions)))
-
-        # Get policy statistics
+        metrics["loss"].append(metric_values[1])
+        metrics["baseline_value"].append(metric_values[2])
+        metrics["mean_advantage"].append(metric_values[3])
+        metrics["std_advantage"].append(metric_values[4])
+        metrics["mean_log_prob"].append(metric_values[5])
+        metrics["mean_action"].append(metric_values[6])
+        metrics["std_action"].append(metric_values[7])
+        metrics["grad_norm"].append(metric_values[8])
+        metrics["grad_variance"].append(metric_values[9])
+        metrics["raw_advantage_std"].append(metric_values[10])
+        # Additional metrics (batched)
         test_states = jnp.zeros((1, 2))  # Test at origin
         test_mean, test_std = policy(test_states)
-        metrics["policy_mean_norm"].append(float(jnp.linalg.norm(test_mean)))
-        metrics["policy_std_mean"].append(float(jnp.mean(test_std)))
-
-        # Returns statistics
-        metrics["returns_mean"].append(float(jnp.mean(all_returns)))
-        metrics["returns_std"].append(float(jnp.std(all_returns)))
+        
+        additional_metrics = jnp.array([
+            episode_length,
+            jnp.minimum(grad_norm, 1.0),  # After clipping
+            jnp.max(episode_batch.actions),
+            jnp.min(episode_batch.actions),
+            jnp.linalg.norm(test_mean),
+            jnp.mean(test_std),
+            jnp.mean(all_returns),
+            jnp.std(all_returns),
+        ])
+        additional_values = [float(x) for x in additional_metrics]
+        
+        metrics["episode_length"].append(additional_values[0])
+        metrics["grad_norm_clipped"].append(additional_values[1])
+        metrics["max_action"].append(additional_values[2])
+        metrics["min_action"].append(additional_values[3])
+        metrics["policy_mean_norm"].append(additional_values[4])
+        metrics["policy_std_mean"].append(additional_values[5])
+        metrics["returns_mean"].append(additional_values[6])
+        metrics["returns_std"].append(additional_values[7])
 
         if verbose and i % 10 == 0:
             print(
