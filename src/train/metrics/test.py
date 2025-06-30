@@ -39,6 +39,8 @@ def test_metrics_tracker_update():
         policy_test_mean=jnp.array([[0.1]]),
         policy_test_std=jnp.array([[0.5]]),
         episodes_per_iter=10,
+        learning_rate=1e-3,
+        entropy=jnp.array(0.5),
     )
     
     # Check metrics were updated
@@ -78,6 +80,8 @@ def test_metrics_tracker_multiple_updates():
             policy_test_mean=jnp.array([[0.0]]),
             policy_test_std=jnp.array([[1.0]]),
             episodes_per_iter=1,
+            learning_rate=1e-3,
+            entropy=jnp.array(0.5),
         )
     
     # Check all metrics have 5 entries
@@ -120,6 +124,8 @@ def test_metrics_tracker_to_dict():
         policy_test_mean=jnp.array([[0.0]]),
         policy_test_std=jnp.array([[1.0]]),
         episodes_per_iter=1,
+        learning_rate=1e-3,
+        entropy=jnp.array(0.5),
     )
     
     metrics_dict = tracker.to_dict()

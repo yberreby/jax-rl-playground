@@ -49,8 +49,8 @@ class MetricsTracker:
         policy_test_mean: Float[Array, "1 act_dim"],
         policy_test_std: Float[Array, "1 act_dim"],
         episodes_per_iter: int,
-        learning_rate: float = None,
-        entropy: Float[Array, ""] = None,
+        learning_rate: float,
+        entropy: Float[Array, ""],
     ) -> None:
         """Update metrics with new values."""
         # Compute episode length
