@@ -6,7 +6,7 @@ from ...pendulum import step, reset_env
 
 # Test constants
 TEST_EPISODE_LENGTH = 10
-TEST_OBS_DIM = 2
+TEST_OBS_DIM = 2  # Raw pendulum state dimension
 TEST_ACTION_DIM = 1
 TEST_HIDDEN_DIM = 16
 RETURN_TOLERANCE = 1e-5
@@ -29,8 +29,9 @@ def test_compute_returns_single_reward():
 
 def test_collect_episode_shapes():
     key = jax.random.PRNGKey(42)
+    # Policy expects 8D features but episode collection stores 2D raw states
     policy = GaussianPolicy(
-        obs_dim=8,  # Features dimension
+        obs_dim=8,  # Policy uses 8D features
         action_dim=TEST_ACTION_DIM,
         hidden_dim=TEST_HIDDEN_DIM,
         use_layernorm=False,
@@ -40,8 +41,8 @@ def test_collect_episode_shapes():
         policy, step, reset_env, key, max_steps=TEST_EPISODE_LENGTH
     )
 
-    # Check shapes
-    assert episode.states.shape[1] == TEST_OBS_DIM
+    # Check shapes - states are raw 2D
+    assert episode.states.shape[1] == TEST_OBS_DIM  # 2D raw states
     assert episode.actions.shape[1] == TEST_ACTION_DIM
     assert episode.rewards.shape == episode.returns.shape
     assert episode.log_probs.shape == episode.rewards.shape
@@ -50,7 +51,7 @@ def test_collect_episode_shapes():
 
 def test_episode_result_structure():
     # Test that EpisodeResult can be created correctly
-    states = jnp.ones((10, 2))
+    states = jnp.ones((10, 2))  # 2D raw states
     actions = jnp.ones((10, 1))
     rewards = jnp.ones(10)
     returns = jnp.ones(10) * 10

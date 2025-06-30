@@ -50,7 +50,7 @@ def test_rk4_accuracy():
 @pytest.mark.slow
 def test_training_speed():
     """Test that training achieves expected performance."""
-    policy = GaussianPolicy(obs_dim=2, action_dim=1, hidden_dim=64)
+    policy = GaussianPolicy(obs_dim=8, action_dim=1, hidden_dim=64)  # 8D features
     
     # Warmup JIT
     key = jax.random.PRNGKey(42)
@@ -79,7 +79,7 @@ def test_training_speed():
 
 def test_shape_consistency():
     """Test that shapes are consistent to avoid JIT recompilation."""
-    policy = GaussianPolicy(obs_dim=2, action_dim=1, hidden_dim=64)
+    policy = GaussianPolicy(obs_dim=8, action_dim=1, hidden_dim=64)  # 8D features
     key = jax.random.PRNGKey(42)
     
     # Single episode collection
@@ -97,10 +97,10 @@ def test_shape_consistency():
 
 def test_loss_explosion_is_expected():
     """Document that loss explosion is expected behavior with tanh squashing."""
-    policy = GaussianPolicy(obs_dim=2, action_dim=1, hidden_dim=64)
+    policy = GaussianPolicy(obs_dim=8, action_dim=1, hidden_dim=64)  # 8D features
     
     # Test log prob near action boundaries
-    obs = jnp.zeros((1, 2))
+    obs = jnp.zeros((1, 8))  # 8D feature vector
     
     # Actions near MAX_TORQUE boundary
     boundary_actions = jnp.array([[149.9], [149.5], [140.0]])

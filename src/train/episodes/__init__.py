@@ -3,12 +3,12 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 from typing import NamedTuple
 import equinox as eqx
-from functools import partial
 from ...policy import sample_actions
+from ...pendulum.features import compute_features
 
 
 class EpisodeResult(NamedTuple):
-    states: Float[Array, "episode_len obs_dim"]
+    states: Float[Array, "episode_len obs_dim"]  # Raw 2D states (theta, theta_dot)
     actions: Float[Array, "episode_len 1"]
     rewards: Float[Array, "episode_len"]
     returns: Float[Array, "episode_len"]
@@ -16,10 +16,10 @@ class EpisodeResult(NamedTuple):
     log_probs: Float[Array, "episode_len"]
 
 
-@partial(jax.jit, static_argnames=["gamma"])
+@jax.jit
 def compute_returns(
     rewards: Float[Array, "episode_len"],
-    gamma: float = 0.99,
+    gamma: Float[Array, ""] = jnp.array(0.99),
 ) -> Float[Array, "episode_len"]:
     """Compute discounted returns."""
     def scan_fn(future_return, reward):
@@ -45,8 +45,9 @@ def collect_episode(
     def step_fn(carry, key):
         env_state, done = carry
 
-        # Sample action from policy
-        action, log_prob = sample_actions(policy, env_state.state, key)
+        # Sample action from policy (converting 2D state to 8D features)
+        features = compute_features(env_state.state)
+        action, log_prob = sample_actions(policy, features, key)
 
         # Step environment
         result = env_step(env_state, action)
@@ -57,7 +58,7 @@ def collect_episode(
         )
         new_done = jnp.maximum(done, result.done)
 
-        # Output for this step (current state, not next) with scaled reward
+        # Output for this step (current raw state, not features) with scaled reward
         scaled_reward = result.reward * reward_scale * (1.0 - done)
         output = (env_state.state, action, scaled_reward, log_prob)
 

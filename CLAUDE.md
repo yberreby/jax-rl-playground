@@ -273,3 +273,32 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 - With MAX_TORQUE < gravity, swing-up requires complex momentum strategies
 - Higher torque limits (e.g., 15 N⋅m) make learning much easier
 - Random policies naturally use boundary actions when torque limit is restrictive
+
+# User Feedback and Lessons
+
+## Always Check Before Committing
+- ALWAYS run `git status` before committing
+- ALWAYS run tests (`just check`) BEFORE committing  
+- The pre-commit hook now enforces this, but still check manually
+
+## API Design Principles
+- Feature encoding (e.g., sin/cos for angles) is an implementation detail
+- Keep raw data in public APIs, convert internally only when needed
+- Example: Episode collection should store raw 2D states, not 8D features
+- Visualization should never need to know about policy-specific transformations
+
+## Error Handling
+- "remove the try catch, LET IT CRASH" - don't hide errors with try/catch
+- Crashes provide valuable stack traces for debugging
+- Silent failures make debugging much harder
+
+## Performance
+- Initial slowness is often JIT compilation, not actual runtime
+- Profile before optimizing (cProfile, py-spy)
+- With proper batching, JAX can achieve 800+ episodes/second
+- vmap provides massive speedups (5000x+ in some cases)
+
+## File Organization  
+- Check directory structure before assuming file locations
+- Use `uv run` from project root directory
+- Don't create nested test directories (tests/tests/)

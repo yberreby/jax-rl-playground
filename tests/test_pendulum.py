@@ -53,8 +53,8 @@ def test_pendulum_features():
 
 def test_episode_collection():
     """Test episode collection with proper length."""
-    # For now, use standard 2D observations
-    policy = GaussianPolicy(obs_dim=2, action_dim=1, hidden_dim=32)
+    # Policy expects 8D features
+    policy = GaussianPolicy(obs_dim=8, action_dim=1, hidden_dim=32)
     key = jax.random.PRNGKey(0)
     
     # Collect episodes
@@ -62,7 +62,7 @@ def test_episode_collection():
         policy, step, reset_env, key, n_episodes=2
     )
     
-    # Check shapes
+    # Check shapes - states are raw 2D pendulum states
     assert episode_batch.states.shape == (2 * MAX_EPISODE_STEPS, 2)
     assert episode_batch.actions.shape == (2 * MAX_EPISODE_STEPS, 1)
     assert episode_batch.rewards.shape == (2 * MAX_EPISODE_STEPS,)
@@ -83,7 +83,7 @@ def test_quick_episode_visualization():
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Initialize
-    policy = GaussianPolicy(obs_dim=2, action_dim=1, hidden_dim=64)
+    policy = GaussianPolicy(obs_dim=8, action_dim=1, hidden_dim=64)
     key = jax.random.PRNGKey(42)
     viz = PendulumVisualizer()
     
@@ -96,7 +96,7 @@ def test_quick_episode_visualization():
         episode = collect_episode(policy, step, reset_env, subkey, max_steps=MAX_EPISODE_STEPS)
         collect_time = time.time() - start_time
         
-        # Convert to lists for visualization
+        # Convert to lists for visualization (states are raw 2D)
         states = [episode.states[t] for t in range(MAX_EPISODE_STEPS)]
         actions = [episode.actions[t] for t in range(MAX_EPISODE_STEPS)]
         rewards = [episode.rewards[t] for t in range(MAX_EPISODE_STEPS)]

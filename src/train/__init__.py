@@ -10,6 +10,7 @@ from ..critic import ValueFunction, update_critic, compute_critic_advantages
 from .episodes import collect_episodes
 from .metrics import MetricsTracker
 from .lr_schedule import create_lr_schedule
+from ..pendulum.features import compute_features
 
 
 class TrainState(NamedTuple):
@@ -98,7 +99,7 @@ def train(
 
     # Initialize critic if requested
     if use_critic:
-        critic = ValueFunction(obs_dim=2, hidden_dim=64)  # Pendulum-specific
+        critic = ValueFunction(obs_dim=2, hidden_dim=64)  # Uses raw 2D states
         critic_optimizer = nnx.Optimizer(
             critic, optax.adam(learning_rate * 2.0)
         )  # Faster critic learning
@@ -125,9 +126,12 @@ def train(
         )
 
         # Data is already aggregated
-        all_states = episode_batch.states
+        all_states = episode_batch.states  # Raw 2D states
         all_actions = episode_batch.actions
         all_returns = episode_batch.returns
+        
+        # Convert raw states to features for policy
+        all_features = jax.vmap(compute_features)(all_states)
 
         # Compute advantages
         if use_critic:
@@ -151,15 +155,16 @@ def train(
 
         # Update policy
         loss, grad_norm, grad_var = train_step(
-            policy, optimizer, all_states, all_actions, normalized_advantages
+            policy, optimizer, all_features, all_actions, normalized_advantages
         )
 
         # Test policy at origin for tracking
-        test_states = jnp.zeros((1, policy.obs_dim))  # Test at origin
-        test_mean, test_std = policy(test_states)
+        test_raw_state = jnp.zeros((1, 2))  # Test at origin (raw state)
+        test_features = compute_features(test_raw_state[0])[None, :]
+        test_mean, test_std = policy(test_features)
         
         # Compute policy entropy (average over batch)
-        _, policy_stds = policy(all_states)
+        _, policy_stds = policy(all_features)
         # Entropy of Gaussian: 0.5 * log(2 * pi * e * sigma^2)
         entropy = jnp.mean(0.5 * jnp.log(2 * jnp.pi * jnp.e * policy_stds**2))
         

@@ -2,14 +2,13 @@
 
 import jax.numpy as jnp
 from jaxtyping import Array, Float
-from typing import Dict, List
 
 
 class MetricsTracker:
     """Track training metrics efficiently."""
     
     def __init__(self):
-        self.metrics: Dict[str, List[float]] = {
+        self.metrics: dict[str, list[float]] = {
             "iteration": [],
             "mean_return": [],
             "std_return": [],
@@ -109,6 +108,6 @@ class MetricsTracker:
                     f"Policy σ: {self.metrics['policy_std_mean'][-1]:5.3f}"
                 )
     
-    def to_dict(self) -> Dict[str, List[float]]:
+    def to_dict(self) -> dict[str, list[float]]:
         """Return metrics as dictionary."""
         return self.metrics

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.patches import Circle, Rectangle, FancyBboxPatch
 import numpy as np
-from typing import List, Optional
+from typing import Optional
 
 
 class PendulumVisualizer:
@@ -44,9 +44,9 @@ class PendulumVisualizer:
 
     def create_animation(
         self,
-        states: List[Float[Array, "2"]],
-        actions: Optional[List[Float[Array, "1"]]] = None,
-        rewards: Optional[List[Float[Array, ""]]] = None,
+        states: list[Float[Array, "2"]],
+        actions: Optional[list[Float[Array, "1"]]] = None,
+        rewards: Optional[list[Float[Array, ""]]] = None,
         filename: str = "pendulum.mp4",
         fps: int = 30,
         bitrate: int = 2400,
@@ -198,13 +198,13 @@ class PendulumVisualizer:
                 f"ω: {float(theta_dot):6.2f} rad/s",
             ]
 
-            if rewards is not None and i > 0:
+            if rewards is not None and i > 0 and len(rewards) > i - 1:
                 info_lines.append(f"R: {float(rewards[i - 1]):6.3f}")
 
             info_text.set_text("\n".join(info_lines))
 
             # Update torque indicator
-            if actions is not None and i > 0:
+            if actions is not None and i > 0 and len(actions) > i - 1:
                 torque = float(actions[i - 1][0])
                 max_torque = 2.0  # Should match environment
                 torque_width = (torque / max_torque) * lim * 0.3
@@ -236,7 +236,7 @@ class PendulumVisualizer:
 
     def create_phase_portrait(
         self,
-        states: List[Float[Array, "2"]],
+        states: list[Float[Array, "2"]],
         filename: str = "phase_portrait.png",
         show_trajectory: bool = True,
         show_vector_field: bool = True,

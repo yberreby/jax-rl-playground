@@ -36,12 +36,12 @@ def generate_video(policy, output_path: str, n_episodes: int = 2):
             # Compute action
             features = compute_features(env_state.state)
             mean, _ = policy(features[None, :])
-            action = mean[0]  # Extract single action value
+            action = mean[0]  # Shape [1]
             
             # Step environment
             result = step(env_state, action)
             
-            states.append(result.state)
+            states.append(result.env_state.state)
             actions.append(action)
             rewards.append(result.reward)
             
@@ -62,18 +62,14 @@ def generate_video(policy, output_path: str, n_episodes: int = 2):
         all_rewards.extend(rewards)
     
     # Create animation
-    try:
-        visualizer.create_animation(
-            states=all_states,
-            actions=all_actions,
-            rewards=all_rewards,
-            filename=output_path,
-            fps=30,
-        )
-        return True
-    except Exception as e:
-        print(f"Warning: Failed to generate video: {e}")
-        return False
+    visualizer.create_animation(
+        states=all_states,
+        actions=all_actions,
+        rewards=all_rewards,
+        filename=output_path,
+        fps=30,
+    )
+    return True
 
 
 def main():
