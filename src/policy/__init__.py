@@ -36,9 +36,11 @@ class GaussianPolicy(nnx.Module):
                 layers.append(nnx.LayerNorm(hidden_dim, use_bias=False, use_scale=False, rngs=rngs))
             layers.append(nnx.Linear(hidden_dim, hidden_dim, kernel_init=w_init, rngs=rngs))
         
-        # Output layer with small initialization
+        # Output layer with moderate initialization
+        # Scale by sqrt(2/hidden_dim) for better initial exploration
         def output_init(key, shape, dtype=None):
-            return jax.random.normal(key, shape, dtype=dtype) * 0.01
+            scale = jnp.sqrt(2.0 / hidden_dim)
+            return jax.random.normal(key, shape, dtype=dtype) * scale
         layers.append(nnx.Linear(hidden_dim, action_dim, kernel_init=output_init, rngs=rngs))
         
         self.layers = layers
