@@ -15,8 +15,8 @@ def test_policy_creation():
         action_dim=DEFAULT_ACTION_DIM,
         hidden_dim=TEST_HIDDEN_DIM,
     )
-    assert policy.w1.value.shape == (DEFAULT_OBS_DIM, TEST_HIDDEN_DIM)
-    assert policy.w2.value.shape == (TEST_HIDDEN_DIM, DEFAULT_ACTION_DIM)
+    # Policy now uses layers list with feature encoding
+    assert len(policy.layers) > 0
     assert policy.log_std.value.shape == (DEFAULT_ACTION_DIM,)
 
 

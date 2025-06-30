@@ -47,7 +47,7 @@ def collect_episode(
     env_step,  # Environment step function
     env_reset,  # Environment reset function
     key: Array,
-    max_steps: int = 200,
+    max_steps: int = 400,
 ) -> EpisodeResult:
     key, reset_key = jax.random.split(key)
     initial_env_state = env_reset(reset_key)
@@ -105,7 +105,7 @@ def collect_episodes(
     env_reset,  # Environment reset function
     key: Array,
     n_episodes: int,
-    max_steps: int = 200,
+    max_steps: int = 400,
 ) -> EpisodeResult:
     keys = jax.random.split(key, n_episodes)
 
@@ -336,7 +336,7 @@ def train(
         metrics["loss"].append(float(loss))
         # Convert baseline to same scale as mean_return for display
         metrics["baseline_value"].append(
-            float(train_state.baseline.mean / 200.0)
+            float(train_state.baseline.mean / 400.0)
         )  # Divide by episode length
         # Note: advantages are now normalized, so std should be close to running estimate
         metrics["mean_advantage"].append(float(jnp.mean(advantages)))

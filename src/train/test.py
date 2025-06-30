@@ -63,15 +63,23 @@ def test_train_step_gradient_flow():
     batch_actions = jax.random.normal(key, (TEST_BATCH_SIZE, TEST_ACTION_DIM))
     batch_advantages = jnp.ones(TEST_BATCH_SIZE)
 
-    # Store initial params
-    initial_w1 = policy.w1.value.copy()
+    # Store initial params - get first layer's params
+    initial_params = nnx.state(policy.layers[0])
 
     # Train step
-    loss = train_step(policy, optimizer, batch_states, batch_actions, batch_advantages)
+    loss, grad_norm, grad_var = train_step(policy, optimizer, batch_states, batch_actions, batch_advantages)
 
     # Check gradient flow
     assert loss.shape == ()
-    assert not jnp.array_equal(policy.w1.value, initial_w1), "Parameters didn't update"
+    assert grad_norm > 0, "No gradients computed"
+    # Check that params updated
+    new_params = nnx.state(policy.layers[0])
+    params_changed = False
+    for k in initial_params:
+        if not jnp.array_equal(initial_params[k].value, new_params[k].value):
+            params_changed = True
+            break
+    assert params_changed, "Parameters didn't update"
 
 
 @pytest.mark.slow

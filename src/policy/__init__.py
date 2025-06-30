@@ -6,6 +6,7 @@ import equinox as eqx
 from src.distributions import gaussian_log_prob
 from src.constants import INITIAL_LOG_STD, DEFAULT_HIDDEN_DIM
 from src.pendulum import MAX_TORQUE
+from src.pendulum.features import compute_features
 
 
 class GaussianPolicy(nnx.Module):
@@ -14,48 +15,56 @@ class GaussianPolicy(nnx.Module):
         obs_dim: int,
         action_dim: int,
         hidden_dim: int = DEFAULT_HIDDEN_DIM,
+        n_hidden_layers: int = 2,
         use_layernorm: bool = True,
         rngs: nnx.Rngs | None = None,
     ):
         if rngs is None:
             rngs = nnx.Rngs(0)
 
-        key1, key2 = jax.random.split(rngs())
-
-        # Initialize weights with orthogonal init (standard)
-        self.w1 = nnx.Param(
-            jax.nn.initializers.orthogonal()(key1, (obs_dim, hidden_dim))
-        )
-        self.b1 = nnx.Param(jnp.zeros(hidden_dim))
-
-        # Small initialization for output layer to prevent initial saturation
-        self.w2 = nnx.Param(jax.random.normal(key2, (hidden_dim, action_dim)) * 0.1)
-        self.b2 = nnx.Param(jnp.zeros(action_dim))
-
+        self.obs_dim = obs_dim
+        self.feature_dim = 8  # Fixed for pendulum features
+        
+        # Build network layers
+        layers = []
+        
+        # Input layer for features
+        w_init = jax.nn.initializers.orthogonal()
+        layers.append(nnx.Linear(self.feature_dim, hidden_dim, kernel_init=w_init, rngs=rngs))
+        
+        # Hidden layers
+        for _ in range(n_hidden_layers - 1):
+            if use_layernorm:
+                layers.append(nnx.LayerNorm(hidden_dim, use_bias=False, use_scale=False, rngs=rngs))
+            layers.append(nnx.Linear(hidden_dim, hidden_dim, kernel_init=w_init, rngs=rngs))
+        
+        # Output layer with small initialization
+        def output_init(key, shape, dtype=None):
+            return jax.random.normal(key, shape, dtype=dtype) * 0.01
+        layers.append(nnx.Linear(hidden_dim, action_dim, kernel_init=output_init, rngs=rngs))
+        
+        self.layers = layers
         self.use_layernorm = use_layernorm
 
-        # LayerNorm WITHOUT learnable parameters
-        if use_layernorm:
-            self.layer_norm = nnx.LayerNorm(
-                num_features=hidden_dim, use_bias=False, use_scale=False, rngs=rngs
-            )
-
-        # Fixed log std for now
+        # Learnable log std
         self.log_std = nnx.Param(jnp.full(action_dim, INITIAL_LOG_STD))
 
     def __call__(
         self, obs: Float[Array, "batch obs_dim"]
     ) -> tuple[Float[Array, "batch act_dim"], Float[Array, "batch act_dim"]]:
-        h = obs @ self.w1.value + self.b1.value
-
-        if self.use_layernorm:
-            # LayerNorm on pre-activations
-            h = self.layer_norm(h)
-
-        h = jax.nn.relu(h)
-
-        # Raw unbounded mean
-        mean = h @ self.w2.value + self.b2.value
+        # Compute features for each observation
+        features = jax.vmap(compute_features)(obs)
+        
+        # Forward through network
+        h = features
+        for i, layer in enumerate(self.layers[:-1]):
+            h = layer(h)
+            # Apply activation after linear layers (skip LayerNorm)
+            if not (self.use_layernorm and isinstance(self.layers[i+1], nnx.LayerNorm)):
+                h = jax.nn.relu(h)
+        
+        # Final layer (no activation)
+        mean = self.layers[-1](h)
 
         std = jnp.exp(self.log_std.value)
         # Broadcast std to match batch dimension
