@@ -4,11 +4,12 @@
 
 The pendulum swing-up task is implemented with:
 
-1. **Feature-enhanced policy** (`src/policy/__init__.py`):
+1. **Feature computation available** (`src/pendulum/features.py`):
    - Sin/cos encoding of angles (cyclical features)
    - Cartesian coordinates and velocities
    - Kinetic energy normalization
    - 8 features total from 2 raw observations
+   - Can be used to preprocess observations before policy
 
 2. **Fixed reward function** (`src/pendulum/__init__.py`):
    - Rewards upright position: `-cos(theta)` gives +1 when up, -1 when down

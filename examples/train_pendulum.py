@@ -32,9 +32,9 @@ def main():
     print(f"Config: LR={args.lr}, Batch={args.batch_size}, Hidden={args.hidden_dim}x{args.n_hidden}")
     print(f"Episodes are {MAX_EPISODE_STEPS} steps long")
     
-    # Initialize policy with features
+    # Initialize policy
     policy = GaussianPolicy(
-        obs_dim=2,
+        obs_dim=2,  # Raw pendulum observations (theta, theta_dot)
         action_dim=1,
         hidden_dim=args.hidden_dim,
         n_hidden_layers=args.n_hidden
