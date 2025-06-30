@@ -11,7 +11,7 @@ LENGTH = 1.0
 DT = 0.05
 MAX_SPEED = 8.0
 MAX_TORQUE = 150.0  # High enough to easily overcome gravity (10 N⋅m)
-MAX_EPISODE_STEPS = 200
+MAX_EPISODE_STEPS = 400  # Longer episodes for better learning
 ACTION_PENALTY_COEF = 0.001
 
 

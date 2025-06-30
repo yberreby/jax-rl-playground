@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.policy import GaussianPolicy
-from src.pendulum import step, reset_env
+from src.pendulum import step, reset_env, MAX_EPISODE_STEPS
 from src.train import collect_episodes
 from src.baseline import BaselineState, update_baseline, compute_advantages
 from src.advantage_normalizer import init_running_stats, update_running_stats, normalize_advantages
@@ -127,7 +127,7 @@ def plot_training_curves(output_dir, metrics_history):
     ax.set_title('Swing-up Times')
     ax.set_xlabel('Iteration')
     ax.set_ylabel('Steps to Swing-up')
-    ax.set_ylim(0, 200)  # Episode length is 200
+    ax.set_ylim(0, MAX_EPISODE_STEPS)
     ax.grid(True, alpha=0.3)
 
     # 7. Energy
@@ -260,9 +260,9 @@ def train_pendulum_with_metrics(
 
         # Compute detailed metrics for the first episode
         episode_metrics = compute_episode_metrics(
-            episode_batch.states[:200],  # First episode
-            episode_batch.rewards[:200],
-            episode_batch.actions[:200]
+            episode_batch.states[:MAX_EPISODE_STEPS],  # First episode
+            episode_batch.rewards[:MAX_EPISODE_STEPS],
+            episode_batch.actions[:MAX_EPISODE_STEPS]
         )
 
         current_return = float(episode_batch.total_reward)
@@ -272,9 +272,9 @@ def train_pendulum_with_metrics(
         if current_return > best_return:
             best_return = current_return
             best_episode_data = {
-                'states': episode_batch.states[:200],
-                'actions': episode_batch.actions[:200],
-                'rewards': episode_batch.rewards[:200]
+                'states': episode_batch.states[:MAX_EPISODE_STEPS],
+                'actions': episode_batch.actions[:MAX_EPISODE_STEPS],
+                'rewards': episode_batch.rewards[:MAX_EPISODE_STEPS]
             }
 
         # Update metrics history
@@ -351,17 +351,24 @@ def train_pendulum_with_metrics(
 
         # Generate visualizations periodically
         if (i + 1) % visualize_every == 0 or i == n_iterations - 1:
-            # Collect a test episode for visualization
+            # Collect a DETERMINISTIC test episode for visualization
+            # Save current policy std and set to zero for deterministic eval
+            saved_std = policy.log_std.value
+            policy.log_std.value = jnp.full_like(saved_std, -10.0)  # Very small std ≈ deterministic
+            
             viz_key = jax.random.PRNGKey(seed + i + 1000)
             viz_episode = collect_episodes(policy, step, reset_env, viz_key, 1)
+            
+            # Restore original std
+            policy.log_std.value = saved_std
 
             # Create video
             viz = PendulumVisualizer(dark_mode=True)
             video_path = output_dir / f'episode_{i+1:03d}.mp4'
             # Convert arrays to lists for visualization
-            states_list = [viz_episode.states[j] for j in range(min(200, len(viz_episode.states)))]
-            actions_list = [viz_episode.actions[j] for j in range(min(200, len(viz_episode.actions)))]
-            rewards_list = [viz_episode.rewards[j] for j in range(min(200, len(viz_episode.rewards)))]
+            states_list = [viz_episode.states[j] for j in range(min(MAX_EPISODE_STEPS, len(viz_episode.states)))]
+            actions_list = [viz_episode.actions[j] for j in range(min(MAX_EPISODE_STEPS, len(viz_episode.actions)))]
+            rewards_list = [viz_episode.rewards[j] for j in range(min(MAX_EPISODE_STEPS, len(viz_episode.rewards)))]
             viz.create_animation(
                 states=states_list,
                 actions=actions_list,
