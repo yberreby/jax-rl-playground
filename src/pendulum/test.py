@@ -68,21 +68,24 @@ def test_damping_with_friction():
 
 
 def test_reward_prefers_upright():
-    upright = jnp.array([0.0, 0.0])
-    downward = jnp.array([jnp.pi, 0.0])
+    # In pendulum convention: theta=0 is down, theta=pi is up
+    downward = jnp.array([0.0, 0.0])  # theta=0 is down
+    upright = jnp.array([jnp.pi, 0.0])  # theta=pi is up
     action = jnp.array([0.0])
 
-    r_upright = reward(upright, action)
     r_downward = reward(downward, action)
+    r_upright = reward(upright, action)
 
     assert r_upright > r_downward, (
         f"Upright reward {r_upright} not > downward reward {r_downward}"
     )
-    assert jnp.isclose(r_upright, 0.0, atol=1e-3), (
-        f"Upright reward should be ~0, got {r_upright}"
+    
+    # With -cos(theta): upright (theta=pi) gives +1, downward (theta=0) gives -1
+    assert jnp.isclose(r_upright, 1.0, atol=1e-3), (
+        f"Upright reward should be ~1, got {r_upright}"
     )
-    assert jnp.isclose(r_downward, -2.0, atol=1e-3), (
-        f"Downward reward should be ~-2, got {r_downward}"
+    assert jnp.isclose(r_downward, -1.0, atol=1e-3), (
+        f"Downward reward should be ~-1, got {r_downward}"
     )
 
 

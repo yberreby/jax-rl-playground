@@ -2,7 +2,6 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PRNGKeyArray, ScalarLike
 from typing import NamedTuple
-import diffrax
 
 # Pendulum constants
 GRAVITY = 10.0
@@ -15,19 +14,6 @@ MAX_EPISODE_STEPS = 400  # Longer episodes for better learning
 ACTION_PENALTY_COEF = 0.001
 
 
-def pendulum_ode(t: Float[Array, ""], y: Float[Array, "2"], args) -> Float[Array, "2"]:
-    theta, theta_dot = y
-    torque = args["torque"]
-    friction = args["friction"]
-
-    dtheta = theta_dot
-    dtheta_dot = (
-        -(GRAVITY / LENGTH) * jnp.sin(theta)
-        + torque / (MASS * LENGTH**2)
-        - friction * theta_dot
-    )
-
-    return jnp.stack([dtheta, dtheta_dot])
 
 
 @jax.jit
@@ -37,22 +23,23 @@ def dynamics(
     theta, theta_dot = state
     torque = jnp.clip(action[0], -MAX_TORQUE, MAX_TORQUE)
 
-    term = diffrax.ODETerm(pendulum_ode)
-    solver = diffrax.Tsit5()
-    saveat = diffrax.SaveAt(t1=True)
-
-    solution = diffrax.diffeqsolve(
-        term,
-        solver,
-        t0=0.0,
-        t1=DT,
-        dt0=DT / 10,
-        y0=state,
-        args={"torque": torque, "friction": friction},
-        saveat=saveat,
-    )
-
-    final_theta, final_theta_dot = solution.ys[0]
+    # RK4 integration (much faster than diffrax for fixed timestep)
+    def dynamics_fn(y):
+        th, th_dot = y
+        th_ddot = -GRAVITY / LENGTH * jnp.sin(th) + torque / (MASS * LENGTH**2) - friction * th_dot
+        return jnp.array([th_dot, th_ddot])
+    
+    # RK4 steps
+    k1 = dynamics_fn(state)
+    k2 = dynamics_fn(state + DT/2 * k1)
+    k3 = dynamics_fn(state + DT/2 * k2)
+    k4 = dynamics_fn(state + DT * k3)
+    
+    # Update state
+    new_state = state + DT/6 * (k1 + 2*k2 + 2*k3 + k4)
+    
+    # Extract and clip values
+    final_theta, final_theta_dot = new_state
     final_theta_dot = jnp.clip(final_theta_dot, -MAX_SPEED, MAX_SPEED)
     final_theta = ((final_theta + jnp.pi) % (2 * jnp.pi)) - jnp.pi
 
