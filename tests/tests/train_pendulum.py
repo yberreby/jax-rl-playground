@@ -36,7 +36,7 @@ def generate_video(policy, output_path: str, n_episodes: int = 2):
             # Compute action
             features = compute_features(env_state.state)
             mean, _ = policy(features[None, :])
-            action = mean[0]
+            action = mean[0]  # Extract single action value
             
             # Step environment
             result = step(env_state, action)
