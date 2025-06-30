@@ -9,3 +9,8 @@ DEFAULT_CLIP_VALUE = 5.0
 
 # Architecture defaults
 DEFAULT_HIDDEN_DIM = 64
+
+# Test defaults
+DEFAULT_OBS_DIM = 4
+DEFAULT_ACTION_DIM = 2
+DEFAULT_SEED = 42

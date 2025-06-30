@@ -1,0 +1,33 @@
+interfaces = []
+exclude = [
+    "**/*__pycache__",
+    "**/*egg-info",
+    "**/docs",
+    "**/venv",
+]
+source_roots = [
+    ".",
+]
+
+[[modules ]]
+path = "customize"
+depends_on = []
+utility = true
+
+[[modules ]]
+path = "conftest"
+depends_on = []
+utility = true
+
+# src cannot depend on anything else
+[[modules ]]
+path = "src"
+depends_on = []
+
+[[modules ]]
+path = "examples"
+depends_on = ["src"]
+
+[[modules ]]
+path = "tests"
+depends_on = ["src"]

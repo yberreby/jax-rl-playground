@@ -1,12 +1,26 @@
 import jax
 import jax.numpy as jnp
-from src.policy import sample_actions
-from tests.fixtures import create_test_policy
-from tests.constants import DEFAULT_OBS_DIM, DEFAULT_ACTION_DIM, DEFAULT_SEED
+from flax import nnx
+from src.policy import sample_actions, GaussianPolicy
+from src.constants import DEFAULT_OBS_DIM, DEFAULT_ACTION_DIM, DEFAULT_SEED
 
 # Test dimensions
 TEST_HIDDEN_DIM = 32
 TEST_BATCH_SIZE = 8
+
+
+def create_test_policy(
+    obs_dim: int = DEFAULT_OBS_DIM,
+    action_dim: int = DEFAULT_ACTION_DIM,
+    hidden_dim: int = TEST_HIDDEN_DIM,
+) -> GaussianPolicy:
+    rngs = nnx.Rngs(DEFAULT_SEED)
+    return GaussianPolicy(
+        obs_dim=obs_dim,
+        action_dim=action_dim,
+        hidden_dim=hidden_dim,
+        rngs=rngs,
+    )
 
 
 def test_policy_creation():

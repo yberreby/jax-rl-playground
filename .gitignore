@@ -27,3 +27,7 @@ tests/outputs/
 
 # Videos
 *.mp4
+
+# Dep graphs
+*.svg
+*.dot
