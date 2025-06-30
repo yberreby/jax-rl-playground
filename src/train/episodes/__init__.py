@@ -3,13 +3,12 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 from typing import NamedTuple
 import equinox as eqx
+from functools import partial
 from ...policy import sample_actions
-from ...pendulum.features import compute_features
 
 
 class EpisodeResult(NamedTuple):
-    states: Float[Array, "episode_len 2"]  # Raw states
-    features: Float[Array, "episode_len 8"]  # Computed features
+    states: Float[Array, "episode_len obs_dim"]
     actions: Float[Array, "episode_len 1"]
     rewards: Float[Array, "episode_len"]
     returns: Float[Array, "episode_len"]
@@ -17,7 +16,7 @@ class EpisodeResult(NamedTuple):
     log_probs: Float[Array, "episode_len"]
 
 
-@jax.jit
+@partial(jax.jit, static_argnames=["gamma"])
 def compute_returns(
     rewards: Float[Array, "episode_len"],
     gamma: float = 0.99,
@@ -46,10 +45,8 @@ def collect_episode(
     def step_fn(carry, key):
         env_state, done = carry
 
-        # Sample action from policy (without adding batch dimension)
-        # We'll handle the unbatched case in sample_actions
-        features = compute_features(env_state.state)
-        action, log_prob = sample_actions(policy, features, key)
+        # Sample action from policy
+        action, log_prob = sample_actions(policy, env_state.state, key)
 
         # Step environment
         result = env_step(env_state, action)
@@ -62,7 +59,7 @@ def collect_episode(
 
         # Output for this step (current state, not next) with scaled reward
         scaled_reward = result.reward * reward_scale * (1.0 - done)
-        output = (env_state.state, features, action, scaled_reward, log_prob)
+        output = (env_state.state, action, scaled_reward, log_prob)
 
         return (new_env_state, new_done), output
 
@@ -70,7 +67,7 @@ def collect_episode(
     keys = jax.random.split(key, max_steps)
 
     # Run scan
-    (final_env_state, final_done), (states, features, actions, rewards, log_probs) = jax.lax.scan(
+    (final_env_state, final_done), (states, actions, rewards, log_probs) = jax.lax.scan(
         step_fn, (initial_env_state, jnp.array(0.0)), keys
     )
 
@@ -82,7 +79,6 @@ def collect_episode(
 
     return EpisodeResult(
         states=states,
-        features=features,
         actions=actions,
         rewards=rewards,
         returns=returns,
@@ -113,10 +109,8 @@ def collect_episodes(
 
     # Flatten batch dimension for training
     obs_dim = results.states.shape[-1]
-    feat_dim = results.features.shape[-1]
     act_dim = results.actions.shape[-1]
     states = results.states.reshape(-1, obs_dim)
-    features = results.features.reshape(-1, feat_dim)
     actions = results.actions.reshape(-1, act_dim)
     rewards = results.rewards.reshape(-1)
     returns = results.returns.reshape(-1)
@@ -130,7 +124,6 @@ def collect_episodes(
 
     return EpisodeResult(
         states=states,
-        features=features,
         actions=actions,
         rewards=rewards,
         returns=returns,

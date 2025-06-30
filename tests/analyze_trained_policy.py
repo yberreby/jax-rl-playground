@@ -6,16 +6,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 
-def analyze_training_results(results_dir: str):
+def analyze_training_results(results_dir: str | Path):
     """Analyze training results and policy behavior."""
-    results_dir = Path(results_dir)
+    results_path = Path(results_dir)
     
     # Load metrics
-    with open(results_dir / "metrics.json") as f:
+    with open(results_path / "metrics.json") as f:
         metrics = json.load(f)
     
     # Print summary statistics
-    print(f"Training Analysis for {results_dir}")
+    print(f"Training Analysis for {results_path}")
     print("=" * 50)
     
     returns = metrics["mean_return"]
@@ -71,8 +71,8 @@ def analyze_training_results(results_dir: str):
     axes[1, 1].grid(True)
     
     plt.tight_layout()
-    plt.savefig(results_dir / "training_analysis.png")
-    print(f"\nSaved analysis plot to {results_dir}/training_analysis.png")
+    plt.savefig(results_path / "training_analysis.png")
+    print(f"\nSaved analysis plot to {results_path}/training_analysis.png")
     
     # Check for specific issues
     print("\nDiagnostics:")

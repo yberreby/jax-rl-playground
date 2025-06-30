@@ -10,7 +10,6 @@ from ..critic import ValueFunction, update_critic, compute_critic_advantages
 from .episodes import collect_episodes
 from .metrics import MetricsTracker
 from .lr_schedule import create_lr_schedule
-from ..pendulum.features import compute_features
 
 
 class TrainState(NamedTuple):
@@ -126,8 +125,7 @@ def train(
         )
 
         # Data is already aggregated
-        all_states = episode_batch.states  # Raw states (for critic if needed)
-        all_features = episode_batch.features  # Features for policy
+        all_states = episode_batch.states
         all_actions = episode_batch.actions
         all_returns = episode_batch.returns
 
@@ -153,16 +151,15 @@ def train(
 
         # Update policy
         loss, grad_norm, grad_var = train_step(
-            policy, optimizer, all_features, all_actions, normalized_advantages
+            policy, optimizer, all_states, all_actions, normalized_advantages
         )
 
         # Test policy at origin for tracking
-        test_states = jnp.zeros((1, 2))  # Test at origin (pendulum-specific)
-        test_features = compute_features(test_states[0])[None, :]  # Add batch dim
-        test_mean, test_std = policy(test_features)
+        test_states = jnp.zeros((1, policy.obs_dim))  # Test at origin
+        test_mean, test_std = policy(test_states)
         
         # Compute policy entropy (average over batch)
-        _, policy_stds = policy(all_features)
+        _, policy_stds = policy(all_states)
         # Entropy of Gaussian: 0.5 * log(2 * pi * e * sigma^2)
         entropy = jnp.mean(0.5 * jnp.log(2 * jnp.pi * jnp.e * policy_stds**2))
         

@@ -17,13 +17,13 @@ def test_compute_returns():
     rewards = jnp.array([1.0, 2.0, 3.0, 4.0])
     expected = jnp.array([10.0, 9.0, 7.0, 4.0])  # Cumulative from each step
 
-    returns = compute_returns(rewards)
+    returns = compute_returns(rewards, gamma=1.0)
     assert jnp.allclose(returns, expected, atol=RETURN_TOLERANCE)
 
 
 def test_compute_returns_single_reward():
     rewards = jnp.array([5.0])
-    returns = compute_returns(rewards)
+    returns = compute_returns(rewards, gamma=1.0)
     assert jnp.allclose(returns, jnp.array([5.0]))
 
 
@@ -42,7 +42,6 @@ def test_collect_episode_shapes():
 
     # Check shapes
     assert episode.states.shape[1] == TEST_OBS_DIM
-    assert episode.features.shape[1] == 8  # Features dimension
     assert episode.actions.shape[1] == TEST_ACTION_DIM
     assert episode.rewards.shape == episode.returns.shape
     assert episode.log_probs.shape == episode.rewards.shape
@@ -52,7 +51,6 @@ def test_collect_episode_shapes():
 def test_episode_result_structure():
     # Test that EpisodeResult can be created correctly
     states = jnp.ones((10, 2))
-    features = jnp.ones((10, 8))
     actions = jnp.ones((10, 1))
     rewards = jnp.ones(10)
     returns = jnp.ones(10) * 10
@@ -61,7 +59,6 @@ def test_episode_result_structure():
     
     result = EpisodeResult(
         states=states,
-        features=features,
         actions=actions,
         rewards=rewards,
         returns=returns,
@@ -70,5 +67,4 @@ def test_episode_result_structure():
     )
     
     assert result.states.shape == (10, 2)
-    assert result.features.shape == (10, 8)
     assert result.total_reward == 1.0
