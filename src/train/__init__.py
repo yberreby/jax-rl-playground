@@ -8,6 +8,7 @@ from ..baseline import BaselineState, update_baseline, compute_advantages
 from ..advantage_normalizer import normalize_advantages
 from ..critic import ValueFunction, update_critic, compute_critic_advantages
 from .episodes import collect_episodes
+from .metrics import MetricsTracker
 
 
 class TrainState(NamedTuple):
@@ -84,36 +85,15 @@ def train(
     else:
         critic = None
         critic_optimizer = None
+        
     train_state = TrainState(
         step=0,
         key=key,
         baseline=BaselineState(mean=jnp.array(0.0), n_samples=0),
     )
 
-    # Tracking
-    metrics = {
-        "iteration": [],
-        "mean_return": [],
-        "std_return": [],
-        "loss": [],
-        "baseline_value": [],
-        "mean_advantage": [],
-        "std_advantage": [],
-        "mean_log_prob": [],
-        "mean_action": [],
-        "std_action": [],
-        "grad_norm": [],
-        "grad_variance": [],
-        "raw_advantage_std": [],
-        "episode_length": [],
-        "grad_norm_clipped": [],
-        "max_action": [],
-        "min_action": [],
-        "policy_mean_norm": [],
-        "policy_std_mean": [],
-        "returns_mean": [],
-        "returns_std": [],
-    }
+    # Initialize metrics tracker
+    metrics_tracker = MetricsTracker()
 
     for i in range(n_iterations):
         # Collect episodes in parallel
@@ -147,79 +127,33 @@ def train(
         raw_adv_std = jnp.std(advantages)
 
         # Normalize advantages
-        advantages = normalize_advantages(advantages)
+        normalized_advantages = normalize_advantages(advantages)
 
         # Update policy
         loss, grad_norm, grad_var = train_step(
-            policy, optimizer, all_states, all_actions, advantages
+            policy, optimizer, all_states, all_actions, normalized_advantages
         )
 
-        # Get log probs from the episode data
-        log_probs = episode_batch.log_probs
-
-        # Compute episode length (for debugging)
-        episode_length = jnp.sum(episode_batch.rewards != 0.0) / episodes_per_iter
-
-        # Track metrics (batched device transfer for efficiency)
-        metric_array = jnp.array([
-            episode_batch.total_reward,
-            loss,
-            train_state.baseline.mean / 400.0,  # Divide by episode length
-            jnp.mean(advantages),
-            jnp.std(advantages),
-            jnp.mean(log_probs),
-            jnp.mean(episode_batch.actions),
-            jnp.std(episode_batch.actions),
-            grad_norm,
-            grad_var,
-            raw_adv_std,
-        ])
-        metric_values = [float(x) for x in metric_array]
-        
-        metrics["iteration"].append(i)
-        metrics["mean_return"].append(metric_values[0])  # This is average per step
-        metrics["std_return"].append(0.0)  # TODO: track individual episode returns
-        metrics["loss"].append(metric_values[1])
-        metrics["baseline_value"].append(metric_values[2])
-        metrics["mean_advantage"].append(metric_values[3])
-        metrics["std_advantage"].append(metric_values[4])
-        metrics["mean_log_prob"].append(metric_values[5])
-        metrics["mean_action"].append(metric_values[6])
-        metrics["std_action"].append(metric_values[7])
-        metrics["grad_norm"].append(metric_values[8])
-        metrics["grad_variance"].append(metric_values[9])
-        metrics["raw_advantage_std"].append(metric_values[10])
-        # Additional metrics (batched)
-        test_states = jnp.zeros((1, 2))  # Test at origin
+        # Test policy at origin for tracking
+        test_states = jnp.zeros((1, 2))  # Test at origin (pendulum-specific)
         test_mean, test_std = policy(test_states)
         
-        additional_metrics = jnp.array([
-            episode_length,
-            jnp.minimum(grad_norm, 1.0),  # After clipping
-            jnp.max(episode_batch.actions),
-            jnp.min(episode_batch.actions),
-            jnp.linalg.norm(test_mean),
-            jnp.mean(test_std),
-            jnp.mean(all_returns),
-            jnp.std(all_returns),
-        ])
-        additional_values = [float(x) for x in additional_metrics]
+        # Update metrics
+        metrics_tracker.update(
+            iteration=i,
+            episode_batch=episode_batch,
+            loss=loss,
+            grad_norm=grad_norm,
+            grad_variance=grad_var,
+            normalized_advantages=normalized_advantages,
+            raw_advantage_std=raw_adv_std,
+            baseline_mean=train_state.baseline.mean,
+            policy_test_mean=test_mean,
+            policy_test_std=test_std,
+            episodes_per_iter=episodes_per_iter,
+        )
         
-        metrics["episode_length"].append(additional_values[0])
-        metrics["grad_norm_clipped"].append(additional_values[1])
-        metrics["max_action"].append(additional_values[2])
-        metrics["min_action"].append(additional_values[3])
-        metrics["policy_mean_norm"].append(additional_values[4])
-        metrics["policy_std_mean"].append(additional_values[5])
-        metrics["returns_mean"].append(additional_values[6])
-        metrics["returns_std"].append(additional_values[7])
+        # Log progress
+        metrics_tracker.log_iteration(i, verbose=verbose)
 
-        if verbose and i % 10 == 0:
-            print(
-                f"Iter {i:3d} | Return: {metrics['mean_return'][-1]:6.3f} | "
-                f"Loss: {metrics['loss'][-1]:10.2f} | "
-                f"GradNorm: {metrics['grad_norm'][-1]:8.2f} | "
-                f"RawAdvStd: {metrics['raw_advantage_std'][-1]:6.2f}"
-            )
-
-    return metrics
+    return metrics_tracker.to_dict()
