@@ -29,9 +29,7 @@ class GaussianPolicy(nnx.Module):
         self.b1 = nnx.Param(jnp.zeros(hidden_dim))
 
         # Small initialization for output layer to prevent initial saturation
-        self.w2 = nnx.Param(
-            jax.random.normal(key2, (hidden_dim, action_dim)) * 0.1
-        )
+        self.w2 = nnx.Param(jax.random.normal(key2, (hidden_dim, action_dim)) * 0.1)
         self.b2 = nnx.Param(jnp.zeros(action_dim))
 
         self.use_layernorm = use_layernorm
@@ -66,9 +64,7 @@ class GaussianPolicy(nnx.Module):
         return mean, std
 
     def log_prob(
-        self,
-        obs: Float[Array, "batch obs_dim"],
-        actions: Float[Array, "batch act_dim"]
+        self, obs: Float[Array, "batch obs_dim"], actions: Float[Array, "batch act_dim"]
     ) -> Float[Array, "batch"]:
         """Compute log probability of actions, accounting for tanh squashing."""
         mean, std = self(obs)
@@ -84,8 +80,7 @@ class GaussianPolicy(nnx.Module):
         # Correction for tanh squashing: subtract log|det J|
         # For a = c*tanh(z/c), we have |det J| = (1 - (a/c)²)
         log_det_jacobian = jnp.sum(
-            jnp.log(1.0 - (actions_clipped / MAX_TORQUE)**2 + 1e-6),
-            axis=-1
+            jnp.log(1.0 - (actions_clipped / MAX_TORQUE) ** 2 + 1e-6), axis=-1
         )
 
         return log_probs - log_det_jacobian

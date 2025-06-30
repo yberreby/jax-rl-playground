@@ -8,19 +8,19 @@ from src.train import compute_returns
 def test_baseline_display_formula():
     """Test the mathematical relationship between baseline and display."""
     print("=== Baseline Display Formula ===")
-    
+
     episode_lengths = [50, 100, 200, 1000]
-    
+
     for length in episode_lengths:
         avg_reward = 0.1
         rewards = jnp.full(length, avg_reward)
         returns = compute_returns(rewards)
         mean_return = jnp.mean(returns)
-        
+
         # Mathematical formula: mean return = avg_reward * (length + 1) / 2
         # This is the sum of arithmetic series divided by n
         expected_mean_return = avg_reward * (length + 1) / 2
-        
+
         print(f"\nEpisode length: {length}")
         print(f"  Avg reward/step: {avg_reward}")
         print(f"  Mean return (computed): {mean_return:.3f}")
@@ -33,14 +33,14 @@ def test_baseline_display_formula():
 def test_correct_baseline_conversion():
     """Test correct conversion from baseline to display value."""
     print("\n=== Correct Baseline Conversion ===")
-    
+
     episode_length = 200
     baseline_value = 10.05  # From our test
-    
+
     # Correct conversion: baseline = avg_reward * (length + 1) / 2
     # So: avg_reward = baseline * 2 / (length + 1)
     display_value = baseline_value * 2 / (episode_length + 1)
-    
+
     print(f"Baseline value: {baseline_value}")
     print(f"Episode length: {episode_length}")
     print(f"Correct display value: {display_value:.3f}")

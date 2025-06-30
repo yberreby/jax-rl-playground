@@ -7,6 +7,7 @@ from typing import NamedTuple
 
 class EpisodeBaseline(NamedTuple):
     """Tracks mean episode total return."""
+
     mean_episode_return: Float[Array, ""]
     n_episodes: int
 
@@ -17,13 +18,13 @@ def update_episode_baseline(
 ) -> EpisodeBaseline:
     """Update baseline with new episode totals."""
     batch_size = episode_totals.shape[0]
-    
+
     # Running average of episode totals
     total_episodes = baseline.n_episodes + batch_size
     new_mean = (
         baseline.mean_episode_return * baseline.n_episodes + jnp.sum(episode_totals)
     ) / total_episodes
-    
+
     return EpisodeBaseline(
         mean_episode_return=new_mean,
         n_episodes=total_episodes,

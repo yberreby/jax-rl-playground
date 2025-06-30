@@ -40,7 +40,9 @@ def test_collect_episode_shapes():
         use_layernorm=False,
     )
 
-    episode = collect_episode(policy, step, reset_env, key, max_steps=TEST_EPISODE_LENGTH)
+    episode = collect_episode(
+        policy, step, reset_env, key, max_steps=TEST_EPISODE_LENGTH
+    )
 
     # Check shapes
     assert episode.states.shape[1] == TEST_OBS_DIM

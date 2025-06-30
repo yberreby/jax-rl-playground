@@ -62,7 +62,7 @@ def dynamics(
 @jax.jit
 def reward(state: Float[Array, "2"], action: Float[Array, "1"]) -> Float[Array, ""]:
     theta, theta_dot = state
-    
+
     # Simple reward: just cos(theta)
     # cos(theta) = -1 when up (theta=pi), +1 when down (theta=0)
     # So -cos(theta) gives +1 when up, -1 when down

@@ -8,13 +8,13 @@ from flax import nnx
 
 class ValueFunction(nnx.Module):
     """Neural network value function V(s)."""
-    
+
     def __init__(self, obs_dim: int, hidden_dim: int = 64, rngs=None):
         if rngs is None:
             rngs = nnx.Rngs(0)
-        
+
         key1, key2, key3 = jax.random.split(rngs(), 3)
-        
+
         self.layers = nnx.Sequential(
             nnx.Linear(obs_dim, hidden_dim, rngs=nnx.Rngs(key1)),
             nnx.tanh,
@@ -22,7 +22,7 @@ class ValueFunction(nnx.Module):
             nnx.tanh,
             nnx.Linear(hidden_dim, 1, rngs=nnx.Rngs(key3)),  # Single output
         )
-    
+
     def __call__(self, obs: Float[Array, "batch obs_dim"]) -> Float[Array, "batch"]:
         """Predict value V(s) for each state."""
         values = self.layers(obs)
@@ -49,10 +49,11 @@ def update_critic(
     returns: Float[Array, "batch"],
 ) -> Float[Array, ""]:
     """Update critic parameters."""
+
     def loss_fn(critic):
         predicted_values = critic(states)
         return jnp.mean((predicted_values - returns) ** 2)
-    
+
     loss, grads = nnx.value_and_grad(loss_fn)(critic)
     optimizer.update(grads)
     return loss

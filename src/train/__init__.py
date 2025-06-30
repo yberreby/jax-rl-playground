@@ -7,7 +7,12 @@ import optax
 import equinox as eqx
 from ..policy import sample_actions
 from ..baseline import BaselineState, update_baseline, compute_advantages
-from ..advantage_normalizer import RunningStats, update_running_stats, normalize_advantages, init_running_stats
+from ..advantage_normalizer import (
+    RunningStats,
+    update_running_stats,
+    normalize_advantages,
+    init_running_stats,
+)
 from ..critic import ValueFunction, update_critic, compute_critic_advantages
 
 
@@ -40,52 +45,49 @@ def compute_returns(
 def collect_episode(
     policy,  # nnx.Module
     env_step,  # Environment step function
-    env_reset,  # Environment reset function  
+    env_reset,  # Environment reset function
     key: Array,
     max_steps: int = 200,
 ) -> EpisodeResult:
     key, reset_key = jax.random.split(key)
     initial_env_state = env_reset(reset_key)
-    
+
     def step_fn(carry, key):
         env_state, done = carry
-        
+
         # Sample action from policy
-        action, log_prob = sample_actions(
-            policy, env_state.state[None, :], key
-        )
+        action, log_prob = sample_actions(policy, env_state.state[None, :], key)
         action = action[0]  # Remove batch dimension
         log_prob = log_prob[0]  # Remove batch dimension
-        
+
         # Step environment
         result = env_step(env_state, action)
-        
+
         # Mask updates if already done
         new_env_state = jax.tree_util.tree_map(
-            lambda new, old: jnp.where(done, old, new),
-            result.env_state, env_state
+            lambda new, old: jnp.where(done, old, new), result.env_state, env_state
         )
         new_done = jnp.maximum(done, result.done)
-        
+
         # Output for this step (current state, not next)
         output = (env_state.state, action, result.reward * (1.0 - done), log_prob)
-        
+
         return (new_env_state, new_done), output
-    
+
     # Generate keys for all steps
     keys = jax.random.split(key, max_steps)
-    
+
     # Run scan
     (final_env_state, final_done), (states, actions, rewards, log_probs) = jax.lax.scan(
         step_fn, (initial_env_state, jnp.array(0.0)), keys
     )
-    
+
     # Compute returns
     returns = compute_returns(rewards)
-    
+
     # Count actual steps
     episode_length = jnp.sum(rewards != 0.0)
-    
+
     return EpisodeResult(
         states=states,
         actions=actions,
@@ -106,15 +108,14 @@ def collect_episodes(
     max_steps: int = 200,
 ) -> EpisodeResult:
     keys = jax.random.split(key, n_episodes)
-    
+
     # vmap over episodes
     vmapped_collect = jax.vmap(
-        lambda k: collect_episode(policy, env_step, env_reset, k, max_steps),
-        in_axes=0
+        lambda k: collect_episode(policy, env_step, env_reset, k, max_steps), in_axes=0
     )
-    
+
     results = vmapped_collect(keys)
-    
+
     # Flatten batch dimension for training
     obs_dim = results.states.shape[-1]
     act_dim = results.actions.shape[-1]
@@ -123,13 +124,13 @@ def collect_episodes(
     rewards = results.rewards.reshape(-1)
     returns = results.returns.reshape(-1)
     log_probs = results.log_probs.reshape(-1)
-    
+
     # Keep per-episode averages
     # Count non-zero rewards to get episode lengths
     episode_lengths = jax.vmap(lambda r: jnp.sum(r != 0.0))(results.rewards)
     episode_sums = jax.vmap(jnp.sum)(results.rewards)
     episode_averages = episode_sums / jnp.maximum(episode_lengths, 1.0)
-    
+
     return EpisodeResult(
         states=states,
         actions=actions,
@@ -148,7 +149,6 @@ def train_step(
     batch_actions: Float[Array, "batch act_dim"],
     batch_advantages: Float[Array, "batch"],
 ) -> tuple[Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
-
     def loss_fn(policy):
         # Use policy's log_prob method
         log_probs = policy.log_prob(batch_states, batch_actions)
@@ -157,13 +157,22 @@ def train_step(
         return -jnp.mean(log_probs * batch_advantages)
 
     loss, grads = nnx.value_and_grad(loss_fn)(policy)
-    
+
     # Compute gradient statistics before update
     grad_leaves = jax.tree_util.tree_leaves(grads)
-    grad_norms = [jnp.linalg.norm(g.value if hasattr(g, 'value') else g) for g in grad_leaves]
+    grad_norms = [
+        jnp.linalg.norm(g.value if hasattr(g, "value") else g) for g in grad_leaves
+    ]
     total_grad_norm = jnp.sqrt(sum(n**2 for n in grad_norms))
-    grad_variance = jnp.var(jnp.concatenate([g.value.flatten() if hasattr(g, 'value') else g.flatten() for g in grad_leaves]))
-    
+    grad_variance = jnp.var(
+        jnp.concatenate(
+            [
+                g.value.flatten() if hasattr(g, "value") else g.flatten()
+                for g in grad_leaves
+            ]
+        )
+    )
+
     optimizer.update(grads)
 
     return loss, total_grad_norm, grad_variance
@@ -182,29 +191,30 @@ def train(
     verbose: bool = True,
     burn_in_iterations: int = 5,
 ) -> dict:
-
     # Initialize
     key = jax.random.PRNGKey(seed)
     optimizer = nnx.Optimizer(
         policy,
         optax.chain(
             optax.clip_by_global_norm(1.0),  # Clip gradients to prevent explosion
-            optax.adam(learning_rate)
-        )
+            optax.adam(learning_rate),
+        ),
     )
-    
+
     # Initialize critic if requested
     if use_critic:
         critic = ValueFunction(obs_dim=2, hidden_dim=64)  # Pendulum-specific
-        critic_optimizer = nnx.Optimizer(critic, optax.adam(learning_rate * 2.0))  # Faster critic learning
+        critic_optimizer = nnx.Optimizer(
+            critic, optax.adam(learning_rate * 2.0)
+        )  # Faster critic learning
     else:
         critic = None
         critic_optimizer = None
     train_state = TrainState(
-        step=0, 
-        key=key, 
+        step=0,
+        key=key,
         baseline=BaselineState(mean=jnp.array(0.0), n_samples=0),
-        advantage_stats=init_running_stats()
+        advantage_stats=init_running_stats(),
     )
 
     # Tracking
@@ -235,18 +245,18 @@ def train(
     # Burn-in phase: collect data to initialize advantage statistics
     if verbose and burn_in_iterations > 0:
         print(f"=== Burn-in phase: {burn_in_iterations} iterations ===")
-    
+
     for burn_i in range(burn_in_iterations):
         # Collect episodes
         key, collect_key = jax.random.split(train_state.key)
         train_state = train_state._replace(key=key)
-        
+
         episode_batch = collect_episodes(
             policy, env_step, env_reset, collect_key, episodes_per_iter
         )
-        
+
         all_returns = episode_batch.returns
-        
+
         # Compute advantages
         if use_baseline:
             advantages = compute_advantages(all_returns, train_state.baseline.mean)
@@ -254,16 +264,18 @@ def train(
             train_state = train_state._replace(baseline=new_baseline)
         else:
             advantages = all_returns
-        
+
         # Update running statistics only (no learning)
         new_adv_stats = update_running_stats(train_state.advantage_stats, advantages)
         train_state = train_state._replace(advantage_stats=new_adv_stats)
-        
+
         if verbose:
-            print(f"Burn-in {burn_i}: mean={float(new_adv_stats.mean):.2f}, "
-                  f"std={float(jnp.sqrt(new_adv_stats.var)):.2f}, "
-                  f"count={float(new_adv_stats.count)}")
-    
+            print(
+                f"Burn-in {burn_i}: mean={float(new_adv_stats.mean):.2f}, "
+                f"std={float(jnp.sqrt(new_adv_stats.var)):.2f}, "
+                f"count={float(new_adv_stats.count)}"
+            )
+
     if verbose and burn_in_iterations > 0:
         print(f"\n=== Training phase: {n_iterations} iterations ===")
 
@@ -271,11 +283,11 @@ def train(
         # Collect episodes in parallel
         key, collect_key = jax.random.split(train_state.key)
         train_state = train_state._replace(key=key)
-        
+
         episode_batch = collect_episodes(
             policy, env_step, env_reset, collect_key, episodes_per_iter
         )
-        
+
         # Data is already aggregated
         all_states = episode_batch.states
         all_actions = episode_batch.actions
@@ -296,30 +308,36 @@ def train(
 
         # Store raw advantage std before normalization
         raw_adv_std = jnp.std(advantages)
-        
+
         # Update running statistics
         new_adv_stats = update_running_stats(train_state.advantage_stats, advantages)
         train_state = train_state._replace(advantage_stats=new_adv_stats)
-        
+
         # Normalize advantages using stable statistics (no centering!)
         advantages = normalize_advantages(advantages, new_adv_stats)
 
         # Update policy
-        loss, grad_norm, grad_var = train_step(policy, optimizer, all_states, all_actions, advantages)
-        
+        loss, grad_norm, grad_var = train_step(
+            policy, optimizer, all_states, all_actions, advantages
+        )
+
         # Get log probs from the episode data
         log_probs = episode_batch.log_probs
-        
+
         # Compute episode length (for debugging)
         episode_length = jnp.sum(episode_batch.rewards != 0.0) / episodes_per_iter
 
         # Track metrics
         metrics["iteration"].append(i)
-        metrics["mean_return"].append(float(episode_batch.total_reward))  # This is average per step
+        metrics["mean_return"].append(
+            float(episode_batch.total_reward)
+        )  # This is average per step
         metrics["std_return"].append(0.0)  # TODO: track individual episode returns
         metrics["loss"].append(float(loss))
         # Convert baseline to same scale as mean_return for display
-        metrics["baseline_value"].append(float(train_state.baseline.mean / 200.0))  # Divide by episode length
+        metrics["baseline_value"].append(
+            float(train_state.baseline.mean / 200.0)
+        )  # Divide by episode length
         # Note: advantages are now normalized, so std should be close to running estimate
         metrics["mean_advantage"].append(float(jnp.mean(advantages)))
         metrics["std_advantage"].append(float(jnp.std(advantages)))
@@ -330,18 +348,20 @@ def train(
         metrics["grad_variance"].append(float(grad_var))
         metrics["raw_advantage_std"].append(float(raw_adv_std))
         metrics["episode_length"].append(float(episode_length))
-        
+
         # Additional metrics
-        metrics["grad_norm_clipped"].append(float(jnp.minimum(grad_norm, 1.0)))  # After clipping
+        metrics["grad_norm_clipped"].append(
+            float(jnp.minimum(grad_norm, 1.0))
+        )  # After clipping
         metrics["max_action"].append(float(jnp.max(episode_batch.actions)))
         metrics["min_action"].append(float(jnp.min(episode_batch.actions)))
-        
+
         # Get policy statistics
         test_states = jnp.zeros((1, 2))  # Test at origin
         test_mean, test_std = policy(test_states)
         metrics["policy_mean_norm"].append(float(jnp.linalg.norm(test_mean)))
         metrics["policy_std_mean"].append(float(jnp.mean(test_std)))
-        
+
         # Returns statistics
         metrics["returns_mean"].append(float(jnp.mean(all_returns)))
         metrics["returns_std"].append(float(jnp.std(all_returns)))
