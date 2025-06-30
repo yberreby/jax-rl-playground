@@ -37,7 +37,7 @@ def collect_episode(
     env_reset,  # Environment reset function
     key: Array,
     max_steps: int = 400,
-    reward_scale: float = 0.1,  # Scale down rewards
+    reward_scale: float = 1.0,  # Use full reward scale
 ) -> EpisodeResult:
     key, reset_key = jax.random.split(key)
     initial_env_state = env_reset(reset_key)

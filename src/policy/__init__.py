@@ -36,10 +36,10 @@ class GaussianPolicy(nnx.Module):
                 layers.append(nnx.LayerNorm(hidden_dim, use_bias=False, use_scale=False, rngs=rngs))
             layers.append(nnx.Linear(hidden_dim, hidden_dim, kernel_init=w_init, rngs=rngs))
         
-        # Output layer with moderate initialization
-        # Scale by sqrt(2/hidden_dim) for better initial exploration
+        # Output layer with moderate initialization for exploration
+        # Not too large to avoid saturation, not too small to ensure movement
         def output_init(key, shape, dtype=None):
-            scale = jnp.sqrt(2.0 / hidden_dim)
+            scale = 0.1  # Moderate scale for better initial exploration
             return jax.random.normal(key, shape, dtype=dtype) * scale
         layers.append(nnx.Linear(hidden_dim, action_dim, kernel_init=output_init, rngs=rngs))
         
@@ -110,7 +110,7 @@ def sample_actions(
     unbounded_actions = mean + std * eps
 
     # Apply tanh squashing to bound actions
-    actions = MAX_TORQUE * jnp.tanh(unbounded_actions)
+    actions = MAX_TORQUE * jnp.tanh(unbounded_actions / MAX_TORQUE)
 
     # Use policy's log_prob method for consistency
     log_probs = policy.log_prob(obs, actions)

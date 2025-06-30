@@ -36,6 +36,11 @@ class MetricsTracker:
             "action_saturation": [],  # Fraction of actions near bounds
             "baseline_error": [],  # |advantages - 0| before normalization
             "explained_variance": [],  # How well baseline predicts returns
+            # Critic metrics
+            "critic_loss": [],  # MSE loss for value function
+            "critic_mean_pred": [],  # Mean predicted value
+            "critic_std_pred": [],  # Std of predicted values
+            "critic_grad_norm": [],  # Gradient norm for critic
         }
     
     def update(
@@ -56,6 +61,11 @@ class MetricsTracker:
         action_saturation: Float[Array, ""],
         explained_variance: Float[Array, ""],
         advantages: Float[Array, "batch"],
+        episode_returns: Float[Array, "n_episodes"] | None = None,
+        critic_loss: Float[Array, ""] | None = None,
+        critic_mean_pred: Float[Array, ""] | None = None,
+        critic_std_pred: Float[Array, ""] | None = None,
+        critic_grad_norm: Float[Array, ""] | None = None,
     ) -> None:
         """Update metrics with new values."""
         # Compute episode length
@@ -82,14 +92,20 @@ class MetricsTracker:
             "min_action": float(jnp.min(episode_batch.actions)),
             "policy_mean_norm": float(jnp.linalg.norm(policy_test_mean)),
             "policy_std_mean": float(jnp.mean(policy_test_std)),
-            "returns_mean": float(jnp.mean(episode_batch.returns)),
-            "returns_std": float(jnp.std(episode_batch.returns)),
+            # Track mean and std of episode returns 
+            "returns_mean": float(jnp.mean(episode_returns)) if episode_returns is not None else float(jnp.mean(episode_batch.returns)),
+            "returns_std": float(jnp.std(episode_returns)) if episode_returns is not None else float(jnp.std(episode_batch.returns)),
             "learning_rate": float(learning_rate) if learning_rate is not None else 0.0,
             "entropy": float(entropy) if entropy is not None else 0.0,
             "kl_divergence": 0.0,  # TODO: implement KL tracking
             "action_saturation": float(action_saturation),
             "baseline_error": float(jnp.mean(jnp.abs(advantages))),
             "explained_variance": float(explained_variance),
+            # Critic metrics
+            "critic_loss": float(critic_loss) if critic_loss is not None else 0.0,
+            "critic_mean_pred": float(critic_mean_pred) if critic_mean_pred is not None else 0.0,
+            "critic_std_pred": float(critic_std_pred) if critic_std_pred is not None else 0.0,
+            "critic_grad_norm": float(critic_grad_norm) if critic_grad_norm is not None else 0.0,
         }
         
         # Update all metrics
@@ -131,6 +147,7 @@ class MetricsTracker:
             
         # Extra debug info every 10 iterations
         if iteration % 10 == 0 and iteration > 0:
+            # Sample a few policy means to see what the network is outputting
             print(
                 f"  DEBUG: policy_mean_norm={self.metrics['policy_mean_norm'][-1]:.3f} "
                 f"returns_mean={self.metrics['returns_mean'][-1]:.3f} "

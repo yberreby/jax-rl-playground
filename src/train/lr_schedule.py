@@ -28,9 +28,11 @@ def create_lr_schedule(
     )
     
     # Cosine decay from base_lr to end_lr
+    # Ensure decay_steps is positive
+    actual_decay_steps = max(1, decay_steps - warmup_steps)
     decay_schedule = optax.cosine_decay_schedule(
         init_value=base_lr,
-        decay_steps=decay_steps - warmup_steps,
+        decay_steps=actual_decay_steps,
         alpha=end_lr_factor,
     )
     

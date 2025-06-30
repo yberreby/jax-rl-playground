@@ -47,16 +47,24 @@ def update_critic(
     optimizer: nnx.Optimizer,
     states: Float[Array, "batch obs_dim"],
     returns: Float[Array, "batch"],
-) -> Float[Array, ""]:
-    """Update critic parameters."""
+) -> tuple[Float[Array, ""], Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
+    """Update critic parameters and return metrics."""
 
     def loss_fn(critic):
         predicted_values = critic(states)
-        return jnp.mean((predicted_values - returns) ** 2)
+        return jnp.mean((predicted_values - returns) ** 2), predicted_values
 
-    loss, grads = nnx.value_and_grad(loss_fn)(critic)
+    (loss, predicted_values), grads = nnx.value_and_grad(loss_fn, has_aux=True)(critic)
     optimizer.update(grads)
-    return loss
+    
+    # Compute gradient norm
+    grad_norm = jnp.sqrt(sum(jnp.sum(g**2) for g in jax.tree.leaves(grads)))
+    
+    # Compute prediction statistics
+    mean_pred = jnp.mean(predicted_values)
+    std_pred = jnp.std(predicted_values)
+    
+    return loss, mean_pred, std_pred, grad_norm
 
 
 def compute_critic_advantages(

@@ -56,7 +56,7 @@ def test_critic_training():
     initial_values = critic(states)
     initial_loss = compute_critic_loss(critic, states, returns)
     print("\nBefore training:")
-    print(f"  Predicted values: {initial_values}")
+    print(f"  Predicted values: mean={jnp.mean(initial_values):.3f}, std={jnp.std(initial_values):.3f}")
     print(f"  Target returns: {returns}")
     print(f"  Loss: {initial_loss:.3f}")
 
@@ -65,13 +65,13 @@ def test_critic_training():
         loss = update_critic(critic, optimizer, states, returns)
         if step % 20 == 0:
             values = critic(states)
-            print(f"  Step {step}: loss={loss:.3f}, values={values}")
+            print(f"  Step {step}: loss={loss:.3f}, mean_value={jnp.mean(values):.3f}")
 
     # Final predictions (should be close to targets)
     final_values = critic(states)
     final_loss = compute_critic_loss(critic, states, returns)
     print("\nAfter training:")
-    print(f"  Predicted values: {final_values}")
+    print(f"  Predicted values: mean={jnp.mean(final_values):.3f}, std={jnp.std(final_values):.3f}")
     print(f"  Target returns: {returns}")
     print(f"  Loss: {final_loss:.3f}")
     print(f"  Improvement: {initial_loss / final_loss:.1f}x")

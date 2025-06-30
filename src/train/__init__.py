@@ -11,6 +11,7 @@ from .episodes import collect_episodes
 from .metrics import MetricsTracker
 from .lr_schedule import create_lr_schedule
 from ..pendulum.features import compute_features
+from functools import partial
 
 
 class TrainState(NamedTuple):
@@ -19,7 +20,7 @@ class TrainState(NamedTuple):
     baseline: BaselineState
 
 
-@nnx.jit
+@partial(nnx.jit, static_argnames=["entropy_coef"])
 def train_step(
     policy,  # nnx.Module
     optimizer,  # nnx.Optimizer
@@ -27,7 +28,7 @@ def train_step(
     batch_actions: Float[Array, "batch act_dim"],
     batch_advantages: Float[Array, "batch"],
     entropy_coef: float = 0.01,
-) -> tuple[Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
+) -> tuple[Float[Array, ""], Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
     def loss_fn(policy):
         # Use policy's log_prob method
         log_probs = policy.log_prob(batch_states, batch_actions)
@@ -39,9 +40,10 @@ def train_step(
 
         # REINFORCE loss with entropy bonus
         pg_loss = -jnp.mean(log_probs * batch_advantages)
-        return pg_loss - entropy_coef * entropy
+        total_loss = pg_loss - entropy_coef * entropy
+        return total_loss, (pg_loss, entropy)
 
-    loss, grads = nnx.value_and_grad(loss_fn)(policy)
+    (loss, (pg_loss, entropy)), grads = nnx.value_and_grad(loss_fn, has_aux=True)(policy)
 
     # Compute gradient statistics before update
     grad_leaves = jax.tree_util.tree_leaves(grads)
@@ -60,7 +62,7 @@ def train_step(
 
     optimizer.update(grads)
 
-    return loss, total_grad_norm, grad_variance
+    return loss, total_grad_norm, grad_variance, entropy
 
 
 def train(
@@ -99,10 +101,44 @@ def train(
 
     # Initialize critic if requested
     if use_critic:
-        critic = ValueFunction(obs_dim=2, hidden_dim=64)  # Uses raw 2D states
+        critic = ValueFunction(obs_dim=8, hidden_dim=64)  # Uses same 8D features as policy
         critic_optimizer = nnx.Optimizer(
             critic, optax.adam(learning_rate * 2.0)
         )  # Faster critic learning
+        
+        # Pretrain critic with initial rollouts
+        if verbose:
+            print("Pretraining critic with initial rollouts...")
+        
+        pretrain_episodes = min(episodes_per_iter * 5, 500)  # Collect 5x batch or max 500
+        key, pretrain_key = jax.random.split(key)
+        
+        from ..pendulum import MAX_EPISODE_STEPS
+        pretrain_batch = collect_episodes(
+            policy, env_step, env_reset, pretrain_key, pretrain_episodes,
+            max_steps=MAX_EPISODE_STEPS, reward_scale=0.1  # Use same scale as training
+        )
+        
+        pretrain_features = jax.vmap(compute_features)(pretrain_batch.states)
+        pretrain_returns = pretrain_batch.returns
+        
+        # Train critic for several iterations
+        for pretrain_iter in range(50):
+            loss, mean_pred, std_pred, grad_norm = update_critic(
+                critic, critic_optimizer, pretrain_features, pretrain_returns
+            )
+            
+            if verbose and pretrain_iter % 10 == 0:
+                # Compute explained variance
+                predictions = critic(pretrain_features)
+                ss_tot = jnp.sum((pretrain_returns - jnp.mean(pretrain_returns))**2)
+                ss_res = jnp.sum((pretrain_returns - predictions)**2)
+                explained_var = 1 - ss_res / (ss_tot + 1e-8)
+                
+                print(f"  Pretrain iter {pretrain_iter}: loss={loss:.4f}, mean_pred={mean_pred:.3f}, explained_var={explained_var:.3f}")
+        
+        if verbose:
+            print("Critic pretraining complete!\n")
     else:
         critic = None
         critic_optimizer = None
@@ -121,39 +157,70 @@ def train(
         key, collect_key = jax.random.split(train_state.key)
         train_state = train_state._replace(key=key)
 
+        from ..pendulum import MAX_EPISODE_STEPS
         episode_batch = collect_episodes(
-            policy, env_step, env_reset, collect_key, episodes_per_iter
+            policy, env_step, env_reset, collect_key, episodes_per_iter,
+            max_steps=MAX_EPISODE_STEPS, reward_scale=0.1
         )
 
         # Data is already aggregated
         all_states = episode_batch.states  # Raw 2D states
         all_actions = episode_batch.actions
+        
+        # Use per-timestep returns for better credit assignment
         all_returns = episode_batch.returns
+        
+        # Get episode returns for metrics
+        returns_per_episode = episode_batch.returns.reshape(episodes_per_iter, -1)
+        episode_returns = returns_per_episode[:, 0]  # Get full episode return
         
         # Convert raw states to features for policy
         all_features = jax.vmap(compute_features)(all_states)
+        
+        # Debug: show policy means vs actual actions (every 50 iterations)
+        if i % 50 == 0 and verbose:
+            # Get policy means for first few states
+            sample_means, _ = policy(all_features[:5])
+            sample_actions = all_actions[:5].flatten()
+            print(f"  POLICY DEBUG: means={sample_means.flatten()}, actions={sample_actions}")
 
         # Compute advantages
+        critic_loss = None
+        critic_mean_pred = None
+        critic_std_pred = None
+        critic_grad_norm = None
+        
         if use_critic:
             # Train critic to predict returns
             assert critic is not None and critic_optimizer is not None
-            update_critic(critic, critic_optimizer, all_states, all_returns)
+            
+            # Debug: show critic predictions vs actual returns (every 10 iterations)
+            if verbose and i % 10 == 0:
+                critic_preds = critic(all_features)
+                print(f"\n  CRITIC DEBUG (iter {i}):")
+                print(f"    First 5 returns: {all_returns[:5]}")
+                print(f"    First 5 critic preds: {critic_preds[:5]}")
+                print(f"    Prediction errors: {(all_returns[:5] - critic_preds[:5])}")
+                print(f"    Returns stats: mean={all_returns.mean():.3f}, std={all_returns.std():.3f}")
+                print(f"    Critic stats: mean={critic_preds.mean():.3f}, std={critic_preds.std():.3f}")
+            
+            critic_loss, critic_mean_pred, critic_std_pred, critic_grad_norm = update_critic(
+                critic, critic_optimizer, all_features, all_returns
+            )
             # Use critic as baseline
-            advantages = compute_critic_advantages(critic, all_states, all_returns)
-        elif use_baseline:
-            advantages = compute_advantages(all_returns, train_state.baseline.mean)
-            new_baseline = update_baseline(train_state.baseline, all_returns)
-            train_state = train_state._replace(baseline=new_baseline)
+            advantages = compute_critic_advantages(critic, all_features, all_returns)
         else:
+            # No baseline - just use raw returns
             advantages = all_returns
 
         # Store raw advantage std before normalization
         raw_adv_std = jnp.std(advantages)
         
         # Compute explained variance (how well baseline predicts returns)
-        if use_baseline:
+        if use_critic:
+            predictions = critic(all_features)
             ss_tot = jnp.sum((all_returns - jnp.mean(all_returns))**2)
-            ss_res = jnp.sum((all_returns - train_state.baseline.mean)**2)
+            ss_res = jnp.sum((all_returns - predictions)**2)
             explained_var = 1 - ss_res / (ss_tot + 1e-8)
         else:
             explained_var = jnp.array(0.0)
@@ -162,19 +229,15 @@ def train(
         normalized_advantages = normalize_advantages(advantages)
 
         # Update policy
-        loss, grad_norm, grad_var = train_step(
-            policy, optimizer, all_features, all_actions, normalized_advantages
+        loss, grad_norm, grad_var, entropy = train_step(
+            policy, optimizer, all_features, all_actions, normalized_advantages, 
+            entropy_coef=0.01
         )
 
         # Test policy at origin for tracking
         test_raw_state = jnp.zeros((1, 2))  # Test at origin (raw state)
         test_features = compute_features(test_raw_state[0])[None, :]
         test_mean, test_std = policy(test_features)
-        
-        # Compute policy entropy (average over batch)
-        _, policy_stds = policy(all_features)
-        # Entropy of Gaussian: 0.5 * log(2 * pi * e * sigma^2)
-        entropy = jnp.mean(0.5 * jnp.log(2 * jnp.pi * jnp.e * policy_stds**2))
         
         # Get current learning rate
         current_lr = float(lr_schedule(i))
@@ -203,6 +266,11 @@ def train(
             action_saturation=action_saturation,
             explained_variance=explained_var,
             advantages=advantages,
+            episode_returns=episode_returns,
+            critic_loss=critic_loss,
+            critic_mean_pred=critic_mean_pred,
+            critic_std_pred=critic_std_pred,
+            critic_grad_norm=critic_grad_norm,
         )
         
         # Log progress

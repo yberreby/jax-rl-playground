@@ -9,8 +9,8 @@ MASS = 1.0
 LENGTH = 1.0
 DT = 0.05
 MAX_SPEED = 8.0
-MAX_TORQUE = 150.0  # High enough to easily overcome gravity (10 N⋅m)
-MAX_EPISODE_STEPS = 400  # Longer episodes for better learning
+MAX_TORQUE = 15.0  # Sufficient to overcome gravity directly
+MAX_EPISODE_STEPS = 200  # 10 seconds at dt=0.05
 ACTION_PENALTY_COEF = 0.001
 
 
@@ -58,8 +58,9 @@ def reward(state: Float[Array, "2"], action: Float[Array, "1"]) -> Float[Array, 
 
 @jax.jit
 def reset(key: PRNGKeyArray) -> Float[Array, "2"]:
-    theta = jax.random.uniform(key, minval=-jnp.pi, maxval=jnp.pi)
-    theta_dot = jax.random.uniform(key, minval=-1.0, maxval=1.0)
+    # Start at bottom with small random perturbation
+    theta = jax.random.uniform(key, minval=-0.1, maxval=0.1)  # Small perturbation around bottom
+    theta_dot = jnp.array(0.0)  # Start with zero velocity
     return jnp.stack([theta, theta_dot])
 
 
