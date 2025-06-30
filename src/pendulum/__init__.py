@@ -10,7 +10,7 @@ MASS = 1.0
 LENGTH = 1.0
 DT = 0.05
 MAX_SPEED = 8.0
-MAX_TORQUE = 2.0
+MAX_TORQUE = 150.0  # High enough to easily overcome gravity (10 N⋅m)
 MAX_EPISODE_STEPS = 200
 ACTION_PENALTY_COEF = 0.001
 
@@ -62,9 +62,11 @@ def dynamics(
 @jax.jit
 def reward(state: Float[Array, "2"], action: Float[Array, "1"]) -> Float[Array, ""]:
     theta, theta_dot = state
-
-    # Simple continuous reward based on height
-    return jnp.cos(theta)
+    
+    # Simple reward: just cos(theta)
+    # cos(theta) = -1 when up (theta=pi), +1 when down (theta=0)
+    # So -cos(theta) gives +1 when up, -1 when down
+    return -jnp.cos(theta)
 
 
 @jax.jit

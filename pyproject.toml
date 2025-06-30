@@ -6,8 +6,6 @@ readme = "README.md"
 license-files = ["LICEN[CS]E*"]
 requires-python = ">=3.12"
 dependencies = [
-    # Our bread and butter.
-    "jax>=0.6.2",
     # "jax[cuda12]>=0.6.2",
     # "jax[cpu]>=0.6.2",
     # Neural network library for JAX.
@@ -31,6 +29,7 @@ dependencies = [
     "optuna>=4.4.0",
     "equinox>=0.12.2",
     "diffrax>=0.7.0",
+    "jax[cuda12]>=0.6.2",
 ]
 
 [project.urls]

@@ -242,3 +242,34 @@ Code like a hacker: concisely, with self-doubt, without fluff, without repeating
 ## Development Methodology
 - When developing a feature, particularly when trying to make a complex pipeline JIT-compatible, you are encouraged to begin by writing throwaway, self-contained test code to pilot a concept, verify that you understand an API, etc. You can write such code to a throwaway/ directory. You can do as many small scripts as you like to try / understand something, then once you've learned what you needed, state it and remove the throwaway files before moving on to an actual implementation.
 - You are encouraged to do this because it is VERY rarely the case that the first version of a file is the correct one, and rewriting from scratch after gaining insights from real interaction with the problem is usually superior to targeted fixes to a bad first draft.
+
+# Debugging Insights
+
+## JAX JIT Debugging
+- YOU CANNOT REMOVE JIT LIKE THIS, THIS IS NOT A SOLUTION.
+- For NNX modules, use @nnx.jit or @eqx.filter_jit, not plain @jax.jit
+- When passing functions/modules to JIT'd functions, use proper decorators
+
+## Policy Gradient Numerical Stability
+- Policy initialization is CRITICAL for tanh-bounded actions
+- Large initial weights → large policy means → tanh saturation → arctanh explosion in log_prob
+- Use small output layer initialization (e.g., normal(0, 0.01)) for final layer
+- Standard initializations (orthogonal) work well for hidden layers
+
+## REINFORCE Loss Magnitudes
+- High loss values come from two multiplicative factors:
+  1. Large cumulative returns over long episodes (e.g., 200 steps → returns of ±200)
+  2. Exploding log probabilities from tanh saturation (can reach -1000)
+- Fix both: proper initialization + appropriate advantage scaling
+
+## Baseline Confusion
+- Be careful about what baseline tracks (episode returns vs timestep returns)
+- Mean of all timestep returns ≠ mean episode return (off by ~100x for 200-step episodes)
+- Episode-level baseline is simpler and more interpretable
+- State-dependent baseline (critic) is better but more complex
+
+## Pendulum Task Insights
+- MAX_TORQUE must exceed gravity torque (10 N⋅m) for easy control
+- With MAX_TORQUE < gravity, swing-up requires complex momentum strategies
+- Higher torque limits (e.g., 15 N⋅m) make learning much easier
+- Random policies naturally use boundary actions when torque limit is restrictive

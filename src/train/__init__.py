@@ -7,12 +7,15 @@ import optax
 import equinox as eqx
 from ..policy import sample_actions
 from ..baseline import BaselineState, update_baseline, compute_advantages
+from ..advantage_normalizer import RunningStats, update_running_stats, normalize_advantages, init_running_stats
+from ..critic import ValueFunction, update_critic, compute_critic_advantages
 
 
 class TrainState(NamedTuple):
     step: int
     key: Array
     baseline: BaselineState
+    advantage_stats: RunningStats
 
 
 class EpisodeResult(NamedTuple):
@@ -144,7 +147,7 @@ def train_step(
     batch_states: Float[Array, "batch obs_dim"],
     batch_actions: Float[Array, "batch act_dim"],
     batch_advantages: Float[Array, "batch"],
-) -> Float[Array, ""]:
+) -> tuple[Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
 
     def loss_fn(policy):
         # Use policy's log_prob method
@@ -154,9 +157,16 @@ def train_step(
         return -jnp.mean(log_probs * batch_advantages)
 
     loss, grads = nnx.value_and_grad(loss_fn)(policy)
+    
+    # Compute gradient statistics before update
+    grad_leaves = jax.tree_util.tree_leaves(grads)
+    grad_norms = [jnp.linalg.norm(g.value if hasattr(g, 'value') else g) for g in grad_leaves]
+    total_grad_norm = jnp.sqrt(sum(n**2 for n in grad_norms))
+    grad_variance = jnp.var(jnp.concatenate([g.value.flatten() if hasattr(g, 'value') else g.flatten() for g in grad_leaves]))
+    
     optimizer.update(grads)
 
-    return loss
+    return loss, total_grad_norm, grad_variance
 
 
 def train(
@@ -167,15 +177,34 @@ def train(
     episodes_per_iter: int = 10,
     learning_rate: float = 1e-3,
     use_baseline: bool = True,
+    use_critic: bool = False,
     seed: int = 0,
     verbose: bool = True,
+    burn_in_iterations: int = 5,
 ) -> dict:
 
     # Initialize
     key = jax.random.PRNGKey(seed)
-    optimizer = nnx.Optimizer(policy, optax.adam(learning_rate))
+    optimizer = nnx.Optimizer(
+        policy,
+        optax.chain(
+            optax.clip_by_global_norm(1.0),  # Clip gradients to prevent explosion
+            optax.adam(learning_rate)
+        )
+    )
+    
+    # Initialize critic if requested
+    if use_critic:
+        critic = ValueFunction(obs_dim=2, hidden_dim=64)  # Pendulum-specific
+        critic_optimizer = nnx.Optimizer(critic, optax.adam(learning_rate * 2.0))  # Faster critic learning
+    else:
+        critic = None
+        critic_optimizer = None
     train_state = TrainState(
-        step=0, key=key, baseline=BaselineState(mean=jnp.array(0.0), n_samples=0)
+        step=0, 
+        key=key, 
+        baseline=BaselineState(mean=jnp.array(0.0), n_samples=0),
+        advantage_stats=init_running_stats()
     )
 
     # Tracking
@@ -190,7 +219,53 @@ def train(
         "mean_log_prob": [],
         "mean_action": [],
         "std_action": [],
+        "grad_norm": [],
+        "grad_variance": [],
+        "raw_advantage_std": [],
+        "episode_length": [],
+        "grad_norm_clipped": [],
+        "max_action": [],
+        "min_action": [],
+        "policy_mean_norm": [],
+        "policy_std_mean": [],
+        "returns_mean": [],
+        "returns_std": [],
     }
+
+    # Burn-in phase: collect data to initialize advantage statistics
+    if verbose and burn_in_iterations > 0:
+        print(f"=== Burn-in phase: {burn_in_iterations} iterations ===")
+    
+    for burn_i in range(burn_in_iterations):
+        # Collect episodes
+        key, collect_key = jax.random.split(train_state.key)
+        train_state = train_state._replace(key=key)
+        
+        episode_batch = collect_episodes(
+            policy, env_step, env_reset, collect_key, episodes_per_iter
+        )
+        
+        all_returns = episode_batch.returns
+        
+        # Compute advantages
+        if use_baseline:
+            advantages = compute_advantages(all_returns, train_state.baseline.mean)
+            new_baseline = update_baseline(train_state.baseline, all_returns)
+            train_state = train_state._replace(baseline=new_baseline)
+        else:
+            advantages = all_returns
+        
+        # Update running statistics only (no learning)
+        new_adv_stats = update_running_stats(train_state.advantage_stats, advantages)
+        train_state = train_state._replace(advantage_stats=new_adv_stats)
+        
+        if verbose:
+            print(f"Burn-in {burn_i}: mean={float(new_adv_stats.mean):.2f}, "
+                  f"std={float(jnp.sqrt(new_adv_stats.var)):.2f}, "
+                  f"count={float(new_adv_stats.count)}")
+    
+    if verbose and burn_in_iterations > 0:
+        print(f"\n=== Training phase: {n_iterations} iterations ===")
 
     for i in range(n_iterations):
         # Collect episodes in parallel
@@ -207,40 +282,76 @@ def train(
         all_returns = episode_batch.returns
 
         # Compute advantages
-        if use_baseline:
+        if use_critic:
+            # Train critic to predict returns
+            update_critic(critic, critic_optimizer, all_states, all_returns)
+            # Use critic as baseline
+            advantages = compute_critic_advantages(critic, all_states, all_returns)
+        elif use_baseline:
             advantages = compute_advantages(all_returns, train_state.baseline.mean)
             new_baseline = update_baseline(train_state.baseline, all_returns)
             train_state = train_state._replace(baseline=new_baseline)
         else:
             advantages = all_returns
 
-        # Normalize advantages
-        advantages = (advantages - jnp.mean(advantages)) / (jnp.std(advantages) + 1e-8)
+        # Store raw advantage std before normalization
+        raw_adv_std = jnp.std(advantages)
+        
+        # Update running statistics
+        new_adv_stats = update_running_stats(train_state.advantage_stats, advantages)
+        train_state = train_state._replace(advantage_stats=new_adv_stats)
+        
+        # Normalize advantages using stable statistics (no centering!)
+        advantages = normalize_advantages(advantages, new_adv_stats)
 
         # Update policy
-        loss = train_step(policy, optimizer, all_states, all_actions, advantages)
+        loss, grad_norm, grad_var = train_step(policy, optimizer, all_states, all_actions, advantages)
         
         # Get log probs from the episode data
         log_probs = episode_batch.log_probs
+        
+        # Compute episode length (for debugging)
+        episode_length = jnp.sum(episode_batch.rewards != 0.0) / episodes_per_iter
 
         # Track metrics
         metrics["iteration"].append(i)
-        metrics["mean_return"].append(float(episode_batch.total_reward))
+        metrics["mean_return"].append(float(episode_batch.total_reward))  # This is average per step
         metrics["std_return"].append(0.0)  # TODO: track individual episode returns
         metrics["loss"].append(float(loss))
-        metrics["baseline_value"].append(float(train_state.baseline.mean))
+        # Convert baseline to same scale as mean_return for display
+        metrics["baseline_value"].append(float(train_state.baseline.mean / 200.0))  # Divide by episode length
+        # Note: advantages are now normalized, so std should be close to running estimate
         metrics["mean_advantage"].append(float(jnp.mean(advantages)))
         metrics["std_advantage"].append(float(jnp.std(advantages)))
         metrics["mean_log_prob"].append(float(jnp.mean(log_probs)))
         metrics["mean_action"].append(float(jnp.mean(episode_batch.actions)))
         metrics["std_action"].append(float(jnp.std(episode_batch.actions)))
+        metrics["grad_norm"].append(float(grad_norm))
+        metrics["grad_variance"].append(float(grad_var))
+        metrics["raw_advantage_std"].append(float(raw_adv_std))
+        metrics["episode_length"].append(float(episode_length))
+        
+        # Additional metrics
+        metrics["grad_norm_clipped"].append(float(jnp.minimum(grad_norm, 1.0)))  # After clipping
+        metrics["max_action"].append(float(jnp.max(episode_batch.actions)))
+        metrics["min_action"].append(float(jnp.min(episode_batch.actions)))
+        
+        # Get policy statistics
+        test_states = jnp.zeros((1, 2))  # Test at origin
+        test_mean, test_std = policy(test_states)
+        metrics["policy_mean_norm"].append(float(jnp.linalg.norm(test_mean)))
+        metrics["policy_std_mean"].append(float(jnp.mean(test_std)))
+        
+        # Returns statistics
+        metrics["returns_mean"].append(float(jnp.mean(all_returns)))
+        metrics["returns_std"].append(float(jnp.std(all_returns)))
 
         if verbose and i % 10 == 0:
             print(
-                f"Iter {i:3d} | Return: {metrics['mean_return'][-1]:7.2f} | "
-                f"Loss: {metrics['loss'][-1]:10.4f} | "
-                f"Baseline: {metrics['baseline_value'][-1]:7.2f} | "
-                f"Adv: {metrics['mean_advantage'][-1]:6.2f}±{metrics['std_advantage'][-1]:5.2f}"
+                f"Iter {i:3d} | Return: {metrics['mean_return'][-1]:6.3f} | "
+                f"Loss: {metrics['loss'][-1]:10.2f} | "
+                f"GradNorm: {metrics['grad_norm'][-1]:8.2f} | "
+                f"RawAdvStd: {metrics['raw_advantage_std'][-1]:6.2f}"
             )
 
     return metrics
