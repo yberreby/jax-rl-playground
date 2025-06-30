@@ -171,7 +171,7 @@ def train_pendulum_with_metrics(
     batch_size=8192,
     hidden_dim=64,
     n_iterations=100,
-    use_critic=False,
+    use_critic=True,  # Enable critic by default
     entropy_weight=0.0,
     visualize_every=25,
     output_dir="tests/outputs/pendulum_single",
@@ -194,7 +194,7 @@ def train_pendulum_with_metrics(
     policy = GaussianPolicy(2, 1, hidden_dim=hidden_dim)
 
     # Initialize optimizer with learning rate schedule with warmup
-    warmup_steps = int(0.1 * n_iterations)  # 10% warmup
+    warmup_steps = int(0.05 * n_iterations)  # 5% warmup - faster ramp up
     schedule = optax.warmup_cosine_decay_schedule(
         init_value=0.0,
         peak_value=learning_rate,
@@ -213,8 +213,16 @@ def train_pendulum_with_metrics(
 
     # Initialize critic if requested
     if use_critic:
-        critic = ValueFunction(obs_dim=2, hidden_dim=64)
-        critic_optimizer = nnx.Optimizer(critic, optax.adam(learning_rate * 2.0))
+        critic = ValueFunction(obs_dim=2, hidden_dim=hidden_dim)  # Match policy hidden dim
+        # Critic learns faster with higher LR and its own schedule
+        critic_schedule = optax.warmup_cosine_decay_schedule(
+            init_value=0.0,
+            peak_value=learning_rate * 3.0,  # 3x policy LR
+            warmup_steps=warmup_steps,
+            decay_steps=n_iterations,
+            end_value=learning_rate * 0.3
+        )
+        critic_optimizer = nnx.Optimizer(critic, optax.adam(critic_schedule))
 
     # Training state
     key = jax.random.PRNGKey(seed)
@@ -460,13 +468,13 @@ def test_single_run():
     print("Running single pendulum training with rich metrics...")
 
     results = train_pendulum_with_metrics(
-        learning_rate=5e-4,
-        batch_size=256,
-        hidden_dim=64,
-        n_iterations=100,
-        use_critic=False,
+        learning_rate=1e-3,  # Higher LR
+        batch_size=1024,  # Larger batch
+        hidden_dim=128,  # Larger network
+        n_iterations=200,  # More iterations
+        use_critic=True,  # Use critic for lower variance
         entropy_weight=0.0,
-        visualize_every=25,
+        visualize_every=50,
         seed=42
     )
 
